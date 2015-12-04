@@ -70,7 +70,7 @@ pub fn main() {
         println!("Santa is on floor {}.", res.end_floor.get());
         match res.basement_time {
             None => println!("Santa did not enter the basement."),
-            Some(bt) => println!("Santa entered the basement at time {}.", bt.get())
+            Some(bt) => println!("Santa entered the basement at character {}.", bt.get() + 1)
         }
     }
 }
@@ -121,5 +121,11 @@ mod test {
     fn spec_line5() {
         case!(")))" => -3, 0);
         case!(")())())" => -3, 0);
+    }
+
+    #[test]
+    fn spec2() {
+        case!(")" => -1, 0);
+        case!("()())" => -1, 4);
     }
 }
