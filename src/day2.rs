@@ -1,5 +1,7 @@
 use std::cmp::min;
+use std::io::{stdin, BufRead};
 use std::ops::{Add, Mul};
+use std::str::FromStr;
 
 // I mean why not use newtypes to make *absolutely sure* I didn't
 // somehow mix up length and area even though the problem is pretty
@@ -57,6 +59,23 @@ impl Mul for Length {
 
 fn wrapping(l: Length, w: Length, h: Length) -> Area {
     2*l*w + 2*w*h + 2*h*l + min(l*w, min(w*h, h*l))
+}
+
+pub fn main() {
+    let stdin = stdin();
+    let total: Area = stdin.lock().lines().map(|line| {
+        let dims: Vec<_> =
+            line.expect("I/O error reading stdin")
+                .split('x')
+                .map(|s| Length(usize::from_str(s).expect("not a number")))
+                .collect();
+        assert_eq!(dims.len(), 3);
+        wrapping(dims[0], dims[1], dims[2])
+    }).fold(Area(0), |aa, a| { aa + a });
+    // (If I wanted to use unstable stuff, I could throw a `Zero` impl
+    // into `linalg_impls!` and just do `.sum()` instead of that last
+    // thing.  But no.)
+    println!("Total area: {}", total.get());
 }
 
 #[cfg(test)]
