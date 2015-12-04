@@ -2,3 +2,6 @@
 name = "adventofcode-2015"
 version = "0.1.0"
 authors = ["Jed Davis <jld@panix.com>"]
+[[bin]]
+name = "day1a"
+path = "src/day1a.rs"
