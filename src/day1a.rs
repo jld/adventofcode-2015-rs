@@ -105,4 +105,16 @@ mod test {
     fn spec_line3() {
         case!("))(((((" => 3, 0);
     }
+
+    #[test]
+    fn spec_line4() {
+        case!("())" => -1, 2);
+        case!("))(" => -1, 0);
+    }
+
+    #[test]
+    fn spec_line5() {
+        case!(")))" => -3, 0);
+        case!(")())())" => -3, 0);
+    }
 }
