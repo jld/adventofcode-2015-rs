@@ -1,4 +1,4 @@
-//use std::io::stdin;
+use std::io::{stdin, BufRead};
 
 // At one point I mixed up a time and a height, which was caught only
 // because one of them was signed.  So let's have some newtypes:
@@ -62,6 +62,19 @@ fn compute(s: &str) -> Result {
     })
 }
 
+pub fn main() {
+    let stdin = stdin();
+    for line in stdin.lock().lines() {
+        let line = line.expect("I/O error reading stdin");
+        let res = compute(&line);
+        println!("Santa is on floor {}.", res.end_floor.get());
+        match res.basement_time {
+            None => println!("Santa did not enter the basement."),
+            Some(bt) => println!("Santa entered the basement at time {}.", bt.get())
+        }
+    }
+}
+
 #[cfg(test)]
 mod test {
     use super::{Result, Height, Time, compute};
@@ -79,14 +92,6 @@ mod test {
                 basement_time: Some(Time($bt))
             })
         };
-    }
-
-    #[test]
-    fn injectivity() {
-        // This is mostly here to make dead code warnings go away.
-        assert_eq!(Time(17).get(), 17);
-        assert_eq!(Height(17).get(), 17);
-        assert_eq!(Height(-17).get(), -17);
     }
 
     #[test]
