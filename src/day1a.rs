@@ -1,5 +1,8 @@
 //use std::io::stdin;
 
+// At one point I mixed up a time and a height, which was caught only
+// because one of them was signed.  So let's have some newtypes:
+
 #[derive(PartialEq, Eq, PartialOrd, Ord, Clone, Copy, Debug)]
 struct Time(usize);
 impl Time {
@@ -27,7 +30,8 @@ enum Move {
     Up,
     Down,
 }
- 
+
+// And isn't this so much nicer than `(isize, Option<usize>)`?
 #[derive(PartialEq, Eq, Clone, Debug)]
 struct Result {
     end_floor: Height,
@@ -61,19 +65,20 @@ fn compute(s: &str) -> Result {
 #[cfg(test)]
 mod test {
     use super::{Result, Height, Time, compute};
-    
-    fn ra(ef: isize) -> Result { Result {
-        end_floor: Height(ef),
-        basement_time: None
-    }}
-    fn rb(ef: isize, bt: usize) -> Result { Result {
-        end_floor: Height(ef),
-        basement_time: Some(Time(bt))
-    }}
 
     macro_rules! case {
-        ($s:expr => $ef:expr) => { assert_eq!(compute($s), ra($ef)) };
-        ($s:expr => $ef:expr, $bt:expr) => { assert_eq!(compute($s), rb($ef, $t)) };
+        ($s:expr => $ef:expr) => {
+            assert_eq!(compute($s), Result {
+                end_floor: Height($ef),
+                basement_time: None
+            })
+        };
+        ($s:expr => $ef:expr, $bt:expr) => {
+            assert_eq!(compute($s), Result {
+                end_floor: Height($ef),
+                basement_time: Some(Time($bt))
+            })
+        };
     }
 
     #[test]
@@ -83,21 +88,21 @@ mod test {
         assert_eq!(Height(17).get(), 17);
         assert_eq!(Height(-17).get(), -17);
     }
-    
+
     #[test]
     fn spec_line1() {
-        assert_eq!(compute("(())"), ra(0));
-        assert_eq!(compute("()()"), ra(0));
+        case!("(())" => 0);
+        case!("()()" => 0);
     }
 
     #[test]
     fn spec_line2() {
-        assert_eq!(compute("((("), ra(3));
-        assert_eq!(compute("(()(()("), ra(3));
+        case!("(((" => 3);
+        case!("(()(()(" => 3);
     }
 
     #[test]
     fn spec_line3() {
-        assert_eq!(compute("))((((("), rb(3, 0));
+        case!("))(((((" => 3, 0);
     }
 }
