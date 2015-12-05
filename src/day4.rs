@@ -1,5 +1,5 @@
 extern crate md5;
-// use std::io::{stdin, BufRead};
+use std::io::{stdin, BufRead};
 
 // The chance that an AdventCoin key's number won't fit in `u32` is:
 //     (1 - 2 ** -20) ** (2 ** 32)
@@ -59,6 +59,14 @@ fn compute(s: &str) -> u64 {
         }
     }
     unreachable!();
+}
+
+pub fn main() {
+    let stdin = stdin();
+    for line in stdin.lock().lines() {
+        let line = line.expect("I/O error reading stdin");
+        println!("{}", compute(&line));
+    }
 }
 
 #[cfg(test)]
