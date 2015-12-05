@@ -213,7 +213,7 @@ fn dump() {
 }
 fn checker<S: Scanner + Clone>(s: S) {
     let stdin = stdin();
-    let mut count: usize = 0;
+    let mut count: u64 = 0;
     for line in stdin.lock().lines() {
         let line = line.expect("I/O error reading stdin");
         if nice(s.clone(), &line) {
