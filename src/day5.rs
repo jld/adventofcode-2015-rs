@@ -1,12 +1,13 @@
 use std::collections::HashMap;
 use std::hash::Hash;
 use std::rc::Rc;
-use std::marker::PhantomData;
 
 trait Scanner {
-    fn zero() -> Self;
     fn step(self, c: char) -> Self;
     fn nice(&self) -> bool;
+}
+trait ZScanner: Scanner {
+    fn zero() -> Self;
 }
 
 fn nice<S: Scanner>(state: S, s: &str) -> bool {
@@ -19,11 +20,9 @@ fn nice<S: Scanner>(state: S, s: &str) -> bool {
 
 
 #[derive(Clone, Debug)]
-struct Tabulate<S: Scanner + Hash + Eq + Clone> {
+struct Tabulate {
     tab: Rc<Tables>,
     state: Idx,
-    // So this is kind of sketchy:
-    phantom: PhantomData<S>
 }
 #[derive(PartialEq, Eq, Debug)]
 struct Tables {
@@ -39,8 +38,7 @@ impl Tables {
         let i = (c as usize).wrapping_sub(LBASE as usize);
         if i < LETTERS { i } else { 0 }
     }
-    fn make<S: Scanner + Hash + Eq + Clone>() -> Tables {
-        let z = S::zero();
+    fn build<S: Scanner + Hash + Eq + Clone>(z: S) -> Tables {
         let mut stoi = HashMap::new();
         let mut itos = Vec::new();
         let mut i = 0;
@@ -72,15 +70,16 @@ impl Tables {
     }
 }
 
-impl<S: Scanner + Hash + Eq + Clone> Scanner for Tabulate<S> {
-    fn zero() -> Tabulate<S> {
+impl Tabulate {
+    fn new<S: Scanner + Hash + Eq + Clone>(s: S) -> Tabulate {
         Tabulate {
-            tab: Rc::new(Tables::make::<S>()),
+            tab: Rc::new(Tables::build(s)),
             state: 0,
-            phantom: PhantomData
         }
     }
-    fn step(self, c: char) -> Tabulate<S> {
+}
+impl Scanner for Tabulate {
+    fn step(self, c: char) -> Tabulate {
         let next = self.tab.step[self.state as usize][Tables::char_lidx(c)];
         Tabulate { state: next, ..self }
     }
@@ -89,25 +88,14 @@ impl<S: Scanner + Hash + Eq + Clone> Scanner for Tabulate<S> {
     }
 }
 
-pub fn main() {
-    let z = FastSanta::zero();
-    for i in 0..z.tab.step.len() {
-        let nn = if z.tab.nice[i] { "nice" } else { "naughty" };
-        let mut tbuf = "[".to_owned();
-        for j in 0..LETTERS {
-            tbuf.push_str(&format!("{}, ", z.tab.step[i][j]));
-        }
-        tbuf.push(']');
-        println!("{} {} => {}", i, nn, tbuf);
-    }
-}
-
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 struct Vowels(u8);
 const VOWELS: [char; 5] = ['a', 'e', 'i', 'o', 'u'];
 const ENOUGH: u8 = 3;
-impl Scanner for Vowels {
+impl ZScanner for Vowels {
     fn zero() -> Vowels { Vowels(0) }
+}
+impl Scanner for Vowels {
     fn step(self, c: char) -> Vowels {
         if self.0 >= ENOUGH {
             debug_assert_eq!(self.0, ENOUGH);
@@ -130,8 +118,10 @@ enum Doubled {
     IfNext(u8),
     Yes,
 }
-impl Scanner for Doubled {
+impl ZScanner for Doubled {
     fn zero() -> Doubled { Doubled::Nope }
+}
+impl Scanner for Doubled {
     fn step(self, c: char) -> Doubled {
         match self {
             Doubled::Yes => Doubled::Yes,
@@ -160,8 +150,10 @@ enum Censor {
     Naughty
 }
 const NONO: [[char; 2]; 4] = [['a', 'b'], ['c', 'd'], ['p', 'q'], ['x', 'y']];
-impl Scanner for Censor {
+impl ZScanner for Censor {
     fn zero() -> Censor { Censor::Clean }
+}
+impl Scanner for Censor {
     fn step(self, c: char) -> Censor {
         match self {
             Censor::Naughty => Censor::Naughty,
@@ -186,10 +178,12 @@ impl Scanner for Censor {
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 struct Both<S: Scanner, T: Scanner>(S, T);
-impl<S: Scanner, T: Scanner> Scanner for Both<S, T> {
+impl<S: ZScanner, T: ZScanner> ZScanner for Both<S, T> {
     fn zero() -> Both<S, T> {
         Both(S::zero(), T::zero())
     }
+}
+impl<S: Scanner, T: Scanner> Scanner for Both<S, T> {
     fn step(self, c: char) -> Both<S, T> {
         Both(self.0.step(c), self.1.step(c))
     }
@@ -199,11 +193,25 @@ impl<S: Scanner, T: Scanner> Scanner for Both<S, T> {
 }
 
 type Santa = Both<Vowels, Both<Doubled, Censor>>;
-type FastSanta = Tabulate<Santa>;
+fn slow_santa() -> Santa { Santa::zero() }
+fn fast_santa() -> Tabulate { Tabulate::new(slow_santa()) }
+
+pub fn main() {
+    let z = fast_santa();
+    for i in 0..z.tab.step.len() {
+        let nn = if z.tab.nice[i] { "nice" } else { "naughty" };
+        let mut tbuf = "[".to_owned();
+        for j in 0..LETTERS {
+            tbuf.push_str(&format!("{}, ", z.tab.step[i][j]));
+        }
+        tbuf.push(']');
+        println!("{} {} => {}", i, nn, tbuf);
+    }
+}
 
 #[cfg(test)]
 mod test {
-    use super::{Scanner, Vowels, Doubled, Censor, Santa, FastSanta, nice};
+    use super::{ZScanner, Vowels, Doubled, Censor, Santa, nice, fast_santa};
 
     #[test]
     fn spec_line1() {
@@ -251,8 +259,8 @@ mod test {
     }
 
     #[test]
-    fn fast_santa() {
-        let z = FastSanta::zero();
+    fn fast_specs() {
+        let z = fast_santa();
         assert!(nice(z.clone(), "ugknbfddgicrmopn"));
         assert!(nice(z.clone(), "aaa"));
         assert!(!nice(z.clone(), "jchzalrnumimnmhp"));
