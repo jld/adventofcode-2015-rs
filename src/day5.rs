@@ -211,7 +211,8 @@ pub fn main() {
 
 #[cfg(test)]
 mod test {
-    use super::{ZScanner, Vowels, Doubled, Censor, Santa, nice, fast_santa};
+    use super::{ZScanner, Vowels, Doubled, Censor, Santa, Both, Tabulate};
+    use super::{nice, fast_santa};
 
     #[test]
     fn spec_line1() {
@@ -267,6 +268,20 @@ mod test {
         assert!(!nice(z.clone(), "haegwjzuvuyypxyu"));
         assert!(!nice(z.clone(), "haegwjzuvuypxxyu"));
         assert!(!nice(z.clone(), "dvszwmarrgswjxmb"));
+    }
+
+    #[test]
+    fn tab_functional() {
+        assert_eq!(fast_santa().tab, fast_santa().tab);
+    }
+
+    #[test]
+    fn tab_extensional() {
+        type T0 = Both<Vowels, Doubled>;
+        type T1 = Both<Doubled, Vowels>;
+        let t0 = Tabulate::new(T0::zero());
+        let t1 = Tabulate::new(T1::zero());
+        assert_eq!(t0.tab, t1.tab);
     }
 }
 
