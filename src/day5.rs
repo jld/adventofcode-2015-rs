@@ -89,6 +89,18 @@ impl<S: Scanner + Hash + Eq + Clone> Scanner for Tabulate<S> {
     }
 }
 
+pub fn main() {
+    let z = FastSanta::zero();
+    for i in 0..z.tab.step.len() {
+        let nn = if z.tab.nice[i] { "nice" } else { "naughty" };
+        let mut tbuf = "[".to_owned();
+        for j in 0..LETTERS {
+            tbuf.push_str(&format!("{}, ", z.tab.step[i][j]));
+        }
+        tbuf.push(']');
+        println!("{} {} => {}", i, nn, tbuf);
+    }
+}
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 struct Vowels(u8);
