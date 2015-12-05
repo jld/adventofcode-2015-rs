@@ -1,5 +1,7 @@
 extern crate md5;
+use std::env;
 use std::io::{stdin, BufRead};
+use std::str::FromStr;
 
 // The chance that an AdventCoin key's number won't fit in `u32` is:
 //     (1 - 2 ** -20) ** (2 ** 32)
@@ -15,6 +17,10 @@ use std::io::{stdin, BufRead};
 //
 // Thus, this doesn't need to be a u64 for this problem, but might as
 // well keep the utility routines general.
+//
+// UPDATE: Okay, so now we have 24-bit AdventCoins, which are still
+// infeasible (e ** -256 ~= 2 ** -369), but larger than that and we'll
+// start actually needing the u64.  So yeah.
 
 fn fmt_gen(b: &mut[u8], n: u64, radix: u64, zero: u8) -> &[u8] {
     let mut i = b.len();
@@ -47,25 +53,29 @@ fn md5_is_zpfx(d: md5::Digest, nz: usize) -> bool {
     return true;
 }
 
-fn compute(s: &str) -> u64 {
+fn compute(s: &str, nz: usize) -> u64 {
     let mut ctx = md5::Context::new();
     ctx.consume(s.as_bytes());
     let mut buf = [0u8; 20];
     for i in 1.. {
         let mut ctx = ctx.clone();
         ctx.consume(fmt_num(&mut buf, i));
-        if md5_is_zpfx(ctx.compute(), 5) {
+        if md5_is_zpfx(ctx.compute(), nz) {
             return i;
         }
     }
     unreachable!();
 }
+// I was going to make a snazzy parallel version, but it's only 2-3s
+// of CPU time.  Maybe if I'm bored.
 
 pub fn main() {
     let stdin = stdin();
+    // argv[1] is the number of hex zeroes, defaulting to 5.
+    let nz = env::args().nth(1).map(|s| usize::from_str(&s).unwrap()).unwrap_or(5);
     for line in stdin.lock().lines() {
         let line = line.expect("I/O error reading stdin");
-        println!("{}", compute(&line));
+        println!("{}", compute(&line, nz));
     }
 }
 
@@ -133,11 +143,11 @@ mod test {
 
     #[test]
     fn slow_spec_1() {
-        assert_eq!(compute("abcdef"), 609043);
+        assert_eq!(compute("abcdef", 5), 609043);
     }
 
     #[test]
     fn slow_spec_2() {
-        assert_eq!(compute("pqrstuv"), 1048970);
+        assert_eq!(compute("pqrstuv", 5), 1048970);
     }
 }
