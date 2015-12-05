@@ -5,7 +5,6 @@ authors = ["Jed Davis <jld@panix.com>"]
 exclude = ["input/*"]
 [dependencies]
 md5 = "0.1.1"
-num_cpus = "0.2.10"
 [[bin]]
 name = "day1"
 path = "src/day1.rs"
