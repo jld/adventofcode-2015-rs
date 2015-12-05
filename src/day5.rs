@@ -1,4 +1,6 @@
 use std::collections::HashMap;
+use std::env;
+use std::io::{stdin, BufRead};
 use std::hash::Hash;
 use std::rc::Rc;
 
@@ -197,7 +199,7 @@ type Santa = Censor<Both<Vowels, Doubled>>;
 fn slow_santa() -> Santa { Santa::zero() }
 fn fast_santa() -> Tabulate { Tabulate::new(slow_santa()) }
 
-pub fn main() {
+fn dump() {
     let z = fast_santa();
     for i in 0..z.tab.step.len() {
         let nn = if z.tab.nice[i] { "nice" } else { "naughty" };
@@ -207,6 +209,27 @@ pub fn main() {
         }
         tbuf.push(']');
         println!("{} {} => {}", i, nn, tbuf);
+    }
+}
+fn checker<S: Scanner + Clone>(s: S) {
+    let stdin = stdin();
+    let mut count: usize = 0;
+    for line in stdin.lock().lines() {
+        let line = line.expect("I/O error reading stdin");
+        if nice(s.clone(), &line) {
+            count += 1;
+        }
+    }
+    println!("{} string{} nice.", count, if count == 1 { " is" } else { "s are" });
+}
+
+pub fn main() {
+    let argv1 = env::args().nth(1);
+    match argv1.as_ref().map(|s| s as &str /* Sigh. */).unwrap_or("fast") {
+        "dump" => dump(),
+        "slow" => checker(slow_santa()),
+        "fast" => checker(fast_santa()),
+        huh => panic!("unknown command {}", huh)
     }
 }
 
