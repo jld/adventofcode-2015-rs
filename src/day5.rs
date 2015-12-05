@@ -144,34 +144,35 @@ impl Scanner for Doubled {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
-enum Censor {
-    Clean,
-    Danger(u8),
+enum Censor<S: Scanner> {
+    Clean(S),
+    Danger(S, u8),
     Naughty
 }
 const NONO: [[char; 2]; 4] = [['a', 'b'], ['c', 'd'], ['p', 'q'], ['x', 'y']];
-impl ZScanner for Censor {
-    fn zero() -> Censor { Censor::Clean }
+impl<S: ZScanner> ZScanner for Censor<S> {
+    fn zero() -> Censor<S> { Censor::Clean(S::zero()) }
 }
-impl Scanner for Censor {
-    fn step(self, c: char) -> Censor {
+impl<S: Scanner> Scanner for Censor<S> {
+    fn step(self, c: char) -> Censor<S> {
         match self {
             Censor::Naughty => Censor::Naughty,
-            Censor::Danger(i) if c == NONO[i as usize][1]  => Censor::Naughty,
-            _ => {
+            Censor::Danger(_, i) if c == NONO[i as usize][1]  => Censor::Naughty,
+            Censor::Danger(s, _) | Censor::Clean(s) => {
+                let s = s.step(c);
                 for (i, nono) in NONO.iter().enumerate() {
                     if c == nono[0] {
-                        return Censor::Danger(i as u8)
+                        return Censor::Danger(s, i as u8)
                     }
                 }
-                Censor::Clean
+                Censor::Clean(s)
             }
         }
     }
     fn nice(&self) -> bool {
         match *self {
             Censor::Naughty => false,
-            _ => true
+            Censor::Danger(ref s, _) | Censor::Clean(ref s) => s.nice()
         }
     }
 }
@@ -192,7 +193,7 @@ impl<S: Scanner, T: Scanner> Scanner for Both<S, T> {
     }
 }
 
-type Santa = Both<Vowels, Both<Doubled, Censor>>;
+type Santa = Censor<Both<Vowels, Doubled>>;
 fn slow_santa() -> Santa { Santa::zero() }
 fn fast_santa() -> Tabulate { Tabulate::new(slow_santa()) }
 
@@ -211,15 +212,25 @@ pub fn main() {
 
 #[cfg(test)]
 mod test {
-    use super::{ZScanner, Vowels, Doubled, Censor, Santa, Both, Tabulate};
+    use super::{Scanner, ZScanner, Vowels, Doubled, Censor, Santa, Both, Tabulate};
     use super::{nice, fast_santa};
+
+    struct Oprah;
+    impl ZScanner for Oprah {
+        fn zero() -> Oprah { Oprah }
+    }
+    impl Scanner for Oprah {
+        fn step(self, _: char) -> Oprah { self }
+        fn nice(&self) -> bool { true }
+    }
+    type CensorTest = Censor<Oprah>;
 
     #[test]
     fn spec_line1() {
         let word = "ugknbfddgicrmopn";
         assert!(nice(Vowels::zero(), word));
         assert!(nice(Doubled::zero(), word));
-        assert!(nice(Censor::zero(), word));
+        assert!(nice(CensorTest::zero(), word));
         assert!(nice(Santa::zero(), word));
     }
 
@@ -228,7 +239,7 @@ mod test {
         let word = "aaa";
         assert!(nice(Vowels::zero(), word));
         assert!(nice(Doubled::zero(), word));
-        assert!(nice(Censor::zero(), word));
+        assert!(nice(CensorTest::zero(), word));
         assert!(nice(Santa::zero(), word));
     }
 
@@ -242,13 +253,13 @@ mod test {
     #[test]
     fn spec_line4() {
         let word = "haegwjzuvuyypxyu";
-        assert!(!nice(Censor::zero(), word));
+        assert!(!nice(CensorTest::zero(), word));
         assert!(!nice(Santa::zero(), word));
     }
     #[test]
     fn spec_line4b() {
         let word = "haegwjzuvuypxxyu";
-        assert!(!nice(Censor::zero(), word));
+        assert!(!nice(CensorTest::zero(), word));
         assert!(!nice(Santa::zero(), word));
     }
 
