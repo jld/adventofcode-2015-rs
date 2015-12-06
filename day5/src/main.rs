@@ -179,6 +179,56 @@ impl<S: Scanner> Scanner for Censor<S> {
     }
 }
 
+#[derive(Clone, Debug)]
+enum DoubleTrouble {
+    Looking { pairmap: BigramSet, last: (u8, u8) },
+    Found
+}
+impl ZScanner for DoubleTrouble {
+    fn zero() -> DoubleTrouble {
+        DoubleTrouble::Looking {
+            pairmap: BigramSet::empty(),
+            last: (0, 0)
+        }
+    }
+}
+#[derive(Clone, Debug)]
+struct BigramSet { bits: [u32; 26] }
+impl BigramSet {
+    fn empty() -> BigramSet { BigramSet{ bits: [0; 26] }}
+    fn contains(&self, l0: u8, l1: u8) -> bool {
+        l0 != 0 && l1 != 0 && self.bits[l0 as usize - 1] & 1 << l1 - 1 != 0
+    }
+    fn add(&mut self, l0: u8, l1: u8) {
+        if l0 != 0 && l1 != 0 {
+            self.bits[l0 as usize - 1] |= 1 << l1 - 1
+        }
+    }
+}
+impl Scanner for DoubleTrouble {
+    fn step(self, c: char) -> DoubleTrouble {
+        match self {
+            DoubleTrouble::Found => DoubleTrouble::Found,
+            DoubleTrouble::Looking { mut pairmap, last: (l0, l1) } => {
+                let l2 = Tables::char_lidx(c) as u8;
+                if pairmap.contains(l1, l2) {
+                    DoubleTrouble::Found
+                } else {
+                    // If this were before the test, then "aaa" would be nice.
+                    pairmap.add(l0, l1);
+                    DoubleTrouble::Looking { pairmap: pairmap, last: (l1, l2) }
+                }
+            }
+        }
+    }
+    fn nice(&self) -> bool {
+        match *self {
+            DoubleTrouble::Found => true,
+            _ => false
+        }
+    }
+}
+
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 struct Both<S: Scanner, T: Scanner>(S, T);
 impl<S: ZScanner, T: ZScanner> ZScanner for Both<S, T> {
@@ -235,8 +285,8 @@ pub fn main() {
 
 #[cfg(test)]
 mod test {
-    use super::{Scanner, ZScanner, Vowels, Doubled, Censor, Santa, Both, Tabulate};
-    use super::{nice, fast_santa};
+    use super::{Scanner, ZScanner, Vowels, Doubled, Censor, Santa, Both, Tabulate,
+                DoubleTrouble, nice, fast_santa};
 
     struct Oprah;
     impl ZScanner for Oprah {
@@ -316,6 +366,18 @@ mod test {
         let t0 = Tabulate::new(T0::zero());
         let t1 = Tabulate::new(T1::zero());
         assert_eq!(t0.tab, t1.tab);
+    }
+
+    #[test]
+    fn dt_spec() {
+        let z = DoubleTrouble::zero();
+        assert!(nice(z.clone(), "xyxy"));
+        assert!(nice(z.clone(), "aabcdefgaa"));
+        assert!(!nice(z.clone(), "aaa"));
+        assert!(nice(z.clone(), "qjhvhtzxzqqjkmpb"));
+        assert!(nice(z.clone(), "xxyxx"));
+        assert!(nice(z.clone(), "uurcxstgmygtbstg"));
+        assert!(!nice(z.clone(), "ieodomkazucvgmuy"));
     }
 }
 
