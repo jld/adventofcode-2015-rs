@@ -1,16 +1,16 @@
 use std::cmp::{min,max};
+use std::ops::Range;
 
 type Coord = u16;
+type Area = u64;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 struct Rect { xmin: Coord, ymin: Coord, xmax: Coord, ymax: Coord }
 
 impl Rect {
-    fn area(self) -> u64 {
-        let xspan = (self.xmax - self.xmin) as u64 + 1;
-        let yspan = (self.ymax - self.ymin) as u64 + 1;
-        xspan * yspan
-    }
+    fn xrange(self) -> Range<usize> { (self.xmin as usize)..(self.xmax as usize + 1) }
+    fn yrange(self) -> Range<usize> { (self.ymin as usize)..(self.ymax as usize + 1) }
+    fn area(self) -> Area { self.xrange().len() as Area * self.yrange().len() as Area }
     fn intersect(self, other: Rect) -> Option<Rect> {
         #![allow(unused_parens)]
         if (self.xmax < other.xmin || other.xmax < self.xmin ||
@@ -36,16 +36,18 @@ impl Rect {
 
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Cmd {
     TurnOff,
     TurnOn,
     Toggle,
 }
 
-fn compute(cmds: &[Cmd], rects: &[Rect]) -> u64 {
+fn compute(cmds: &[Cmd], rects: &[Rect]) -> Area {
     // parallel arrays save memory (not that it matters)
     assert_eq!(cmds.len(), rects.len());
     assert_eq!(cmds.len() as u32 as usize, cmds.len());
+    #[derive(Debug)]
     struct State {
         bnd: Rect,
         idx: u32, // u32 saves memory (not that it matters)
@@ -58,7 +60,10 @@ fn compute(cmds: &[Cmd], rects: &[Rect]) -> u64 {
     let bnd0 = rects.iter().skip(1).fold(rects[0], |ra, &rb| ra.merge(rb));
     stack.push(State { bnd: bnd0, idx: cmds.len() as u32, inv: false });
     let mut area = 0;
+    // println!("Starting...");
     while let Some(State { bnd, mut idx, inv }) = stack.pop() {
+        // println!("Handling bnd={:?} idx={:?} inv={:?}", bnd, idx, inv);
+        debug_assert!(bnd.xmin <= bnd.xmax && bnd.ymin <= bnd.ymax);
         let mut maybe_hit = None;
         while maybe_hit.is_none() && idx > 0 {
             idx -= 1;
@@ -74,8 +79,8 @@ fn compute(cmds: &[Cmd], rects: &[Rect]) -> u64 {
             Some(hit) => hit,
         };
         match cmds[idx as usize] {
-            Cmd::TurnOff => (),
-            Cmd::TurnOn => area += hit.area(),
+            Cmd::TurnOff => if inv { area += hit.area() },
+            Cmd::TurnOn => if !inv { area += hit.area() },
             Cmd::Toggle => stack.push(State { bnd: hit, idx: idx, inv: !inv }),
         };
         // FIXME: the side rects could be arranged otherwise; does it matter?
@@ -96,9 +101,102 @@ fn compute(cmds: &[Cmd], rects: &[Rect]) -> u64 {
         }
         if bnd.ymax > hit.ymax {
             stack.push(State { bnd: Rect { xmin: hit.xmin, xmax: hit.xmax,
-                                           ymin: bnd.ymax + 1, ymax: hit.ymax },
+                                           ymin: hit.ymax + 1, ymax: bnd.ymax },
                                idx: idx, inv: inv });
         }
     }
     area
+}
+
+fn compute_simple(cmds: &[Cmd], rects: &[Rect]) -> Area {
+    if cmds.len() == 0 {
+        return 0;
+    }
+    let bnd = rects.iter().skip(1).fold(rects[0], |ra, &rb| ra.merge(rb));
+    let mut lights = vec![vec![false; bnd.xrange().len()]; bnd.yrange().len()];
+    for i in 0..cmds.len() {
+        let r = rects[i];
+        for y in r.yrange() {
+            for x in r.xrange() {
+                let light = &mut lights[y - bnd.ymin as usize][x - bnd.xmin as usize];
+                match cmds[i] {
+                    Cmd::TurnOff => *light = false,
+                    Cmd::TurnOn => *light = true,
+                    Cmd::Toggle => *light = !*light,
+                }
+            }
+        }
+    }
+    lights.iter()
+          .map(|row| row.iter()
+                        .map(|&light| if light { 1 } else { 0 })
+                        .fold(0, |a, n| a + n))
+          .fold(0, |a, n| a + n)
+}
+
+#[cfg(test)]
+mod test {
+    use super::{compute, compute_simple, Coord, Area, Cmd, Rect};
+
+    type FlatCase = [(Cmd, (Coord, Coord), (Coord, Coord), Option<Area>)];
+
+    fn run_case(flat: &FlatCase) {
+        let mut cmds = Vec::new();
+        let mut rects = Vec::new();
+        for &(cmd, (xmin, ymin), (xmax, ymax), maybe_exp) in flat {
+            cmds.push(cmd);
+            rects.push(Rect { xmin: xmin, xmax: xmax, ymin: ymin, ymax: ymax });
+            let actual_simple = compute_simple(&cmds, &rects);
+            if let Some(expected) = maybe_exp {
+                assert!(actual_simple == expected,
+                        "compute_simple failure: got {}; expected {}; cmds={:?} rects={:?}",
+                        actual_simple, expected, cmds, rects);
+            }
+            let actual = compute(&cmds, &rects);
+            assert!(actual == actual_simple,
+                    "divergence: got {}; expected {}; cmds={:?} rects={:?}",
+                    actual, actual_simple, cmds, rects);
+        }
+    }
+
+    #[test]
+    fn very_simple() {
+        run_case(&[(Cmd::TurnOn, (1, 1), (2, 3), Some(6))]);
+        run_case(&[(Cmd::Toggle, (1, 1), (2, 3), Some(6))]);
+        run_case(&[(Cmd::TurnOff, (1, 1), (2, 3), Some(0))]);
+        run_case(&[(Cmd::TurnOn, (11, 21), (12, 23), Some(6))]);
+        run_case(&[(Cmd::TurnOn, (1, 1), (2, 3), None),
+                   (Cmd::TurnOn, (1, 1), (2, 3), Some(6))]);
+        run_case(&[(Cmd::Toggle, (1, 1), (2, 3), None),
+                   (Cmd::Toggle, (1, 1), (2, 3), Some(0))]);
+        run_case(&[(Cmd::TurnOn, (1, 1), (2, 3), None),
+                   (Cmd::TurnOff, (1, 1), (2, 3), Some(0))]);
+        run_case(&[(Cmd::Toggle, (1, 1), (2, 3), None),
+                   (Cmd::Toggle, (1, 1), (3, 2), Some(4))]);
+        run_case(&[(Cmd::TurnOn, (1, 1), (2, 3), None),
+                   (Cmd::TurnOff, (1, 1), (3, 2), Some(2))]);
+    }
+
+    #[test]
+    fn example1() {
+        run_case(&[(Cmd::TurnOn, (0, 0), (999, 999), Some(1000000))]);
+        run_case(&[(Cmd::TurnOn, (0, 0), (9, 9), Some(100)),
+                   (Cmd::TurnOn, (0, 0), (999, 999), Some(1000000))]);
+    }
+
+    #[test]
+    fn example2() {
+        run_case(&[(Cmd::Toggle, (0, 0), (999, 0), Some(1000))]);
+        run_case(&[(Cmd::TurnOn, (0, 0), (9, 9), Some(100)),
+                   (Cmd::Toggle, (0, 0), (999, 0), Some(1000 - 10 + 90))]);
+    }
+
+    #[test]
+    fn example3() {
+        run_case(&[(Cmd::TurnOff, (499, 499), (500, 500), Some(0))]);
+        run_case(&[(Cmd::TurnOn, (498, 498), (501, 499), Some(8)),
+                   (Cmd::TurnOff, (499, 499), (500, 500), Some(6))]);
+        run_case(&[(Cmd::TurnOn, (498, 498), (499, 501), Some(8)),
+                   (Cmd::TurnOff, (499, 499), (500, 500), Some(6))]);
+    }
 }
