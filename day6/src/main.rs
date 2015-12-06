@@ -161,7 +161,7 @@ impl fmt::Display for ParseError {
             ParseError::EOL =>
                 write!(f, "unexpected end of line"),
             ParseError::ExtraJunk(ref junk) =>
-                write!(f, "unexpected words {:?} after command", junk),
+                write!(f, "unexpected text {:?} after command", junk),
             ParseError::BadVerb(ref verb) =>
                 write!(f, "unrecognized verb {:?}; expected \"toggle\" or \"turn\"", verb),
             ParseError::BadState(ref state) =>
@@ -380,5 +380,63 @@ mod test {
                    (Cmd::Toggle, Rect::new((0, 0), (999, 0))));
         assert_eq!(parse("turn off 499,499 through 500,500").unwrap(),
                    (Cmd::TurnOff, Rect::new((499, 499), (500, 500))));
+    }
+
+    #[test]
+    fn parse_spacey() {
+        assert_eq!(parse("turn on   0,0 through 999,999").unwrap(),
+                   (Cmd::TurnOn, Rect::new((0, 0), (999, 999))));
+        assert_eq!(parse("     turn on   0,0 through 999,999").unwrap(),
+                   (Cmd::TurnOn, Rect::new((0, 0), (999, 999))));
+        assert_eq!(parse("     turn  on   0,0   through   999,999     ").unwrap(),
+                   (Cmd::TurnOn, Rect::new((0, 0), (999, 999))));
+        assert_eq!(parse("\tturn on 0,0\tthrough 999,999\t\r").unwrap(),
+                   (Cmd::TurnOn, Rect::new((0, 0), (999, 999))));
+    }
+
+    #[test] #[should_panic(expected="unrecognized verb \"switch\"")]
+    fn parse_fail_verb() {
+        panic!("{}", parse("switch on 0,0 through 999,999").unwrap_err());
+    }
+    #[test] #[should_panic(expected="unrecognized state \"up\"")]
+    fn parse_fail_state() {
+        panic!("{}", parse("turn up 0,0 through 999,999").unwrap_err());
+    }
+    #[test] #[should_panic(expected="unrecognized preposition \"to\"")]
+    fn parse_fail_prep() {
+        panic!("{}", parse("turn on 0,0 to 999,999").unwrap_err());
+    }
+    #[test] #[should_panic(expected="expected comma-separated pair; got \"0\"")]
+    fn parse_fail_comma1() {
+        panic!("{}", parse("turn on 0 through 999,999").unwrap_err());
+    }
+    #[test] #[should_panic(expected="expected comma-separated pair; got \"0,0,\"")]
+    fn parse_fail_comma2() {
+        panic!("{}", parse("turn on 0,0, through 999,999").unwrap_err());
+    }
+    #[test] #[should_panic(expected="unexpected end of line")]
+    fn parse_fail_end1() {
+        panic!("{}", parse("turn on 0,0").unwrap_err());
+        // There are a few other variants but I don't feel like writing them all.
+    }
+    #[test] #[should_panic(expected="unexpected text \"or else\" after")]
+    fn parse_fail_end2() {
+        panic!("{}", parse("turn on 0,0 through 999,999 or else").unwrap_err());
+    }
+    #[test] #[should_panic(expected="number too large")]
+    fn parse_fail_overflow() {
+        panic!("{}", parse("turn on 0,0 through 99999,9").unwrap_err());
+    }
+    #[test] #[should_panic(expected="invalid digit")]
+    fn parse_fail_underflow() {
+        panic!("{}", parse("turn on -999,0 through 0,999").unwrap_err());
+    }
+    #[test] #[should_panic(expected="invalid digit")]
+    fn parse_fail_nan() {
+        panic!("{}", parse("turn on 0,0 through 0x3e7,0x3e7").unwrap_err());
+    }
+    #[test] #[should_panic(expected="parse integer from empty string")]
+    fn parse_fail_emptynum() {
+        panic!("{}", parse("turn on 0, through 999,999").unwrap_err());
     }
 }
