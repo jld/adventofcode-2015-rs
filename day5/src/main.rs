@@ -229,6 +229,7 @@ impl Scanner for DoubleTrouble {
     }
 }
 
+// What's round on both sides and high in the middle?  A camel.
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
 enum Camel {
     Starting,
@@ -236,6 +237,8 @@ enum Camel {
     Foraging(char, char),
     Resting,
 }
+// ...yes, I know that's how the joke is *supposed* to go, I mean I
+// lived in Ohio for four years and all, but... oh, never mind.
 impl ZScanner for Camel {
     fn zero() -> Camel {
         Camel::Starting
@@ -277,6 +280,8 @@ impl<S: Scanner, T: Scanner> Scanner for Both<S, T> {
 type Santa = Censor<Both<Vowels, Doubled>>;
 fn slow_santa() -> Santa { Santa::zero() }
 fn fast_santa() -> Tabulate { Tabulate::new(slow_santa()) }
+type SantaTwo = Both<DoubleTrouble, Camel>;
+fn new_santa() -> SantaTwo { SantaTwo::zero() }
 
 fn dump() {
     let z = fast_santa();
@@ -315,7 +320,7 @@ pub fn main() {
 #[cfg(test)]
 mod test {
     use super::{Scanner, ZScanner, Vowels, Doubled, Censor, Santa, Both, Tabulate,
-                DoubleTrouble, Camel, nice, fast_santa};
+                DoubleTrouble, Camel, nice, fast_santa, new_santa};
 
     struct Oprah;
     impl ZScanner for Oprah {
@@ -419,6 +424,15 @@ mod test {
         assert!(nice(z.clone(), "xxyxx"));
         assert!(!nice(z.clone(), "uurcxstgmygtbstg"));
         assert!(nice(z.clone(), "ieodomkazucvgmuy"));
+    }
+
+    #[test]
+    fn s2_spec() {
+        let z = new_santa();
+        assert!(nice(z.clone(), "qjhvhtzxzqqjkmpb"));
+        assert!(nice(z.clone(), "xxyxx"));
+        assert!(!nice(z.clone(), "uurcxstgmygtbstg"));
+        assert!(!nice(z.clone(), "ieodomkazucvgmuy"));
     }
 }
 
