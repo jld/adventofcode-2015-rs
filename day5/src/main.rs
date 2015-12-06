@@ -322,6 +322,8 @@ mod test {
     use super::{Scanner, ZScanner, Vowels, Doubled, Censor, Santa, Both, Tabulate,
                 DoubleTrouble, Camel, nice, fast_santa, new_santa};
 
+    fn naughty<S: Scanner>(state: S, s: &str) -> bool { !nice(state, s) }
+
     struct Oprah;
     impl ZScanner for Oprah {
         fn zero() -> Oprah { Oprah }
@@ -353,28 +355,28 @@ mod test {
     #[test]
     fn spec_line3() {
         let word = "jchzalrnumimnmhp";
-        assert!(!nice(Doubled::zero(), word));
-        assert!(!nice(Santa::zero(), word));
+        assert!(naughty(Doubled::zero(), word));
+        assert!(naughty(Santa::zero(), word));
     }
 
     #[test]
     fn spec_line4() {
         let word = "haegwjzuvuyypxyu";
-        assert!(!nice(CensorTest::zero(), word));
-        assert!(!nice(Santa::zero(), word));
+        assert!(naughty(CensorTest::zero(), word));
+        assert!(naughty(Santa::zero(), word));
     }
     #[test]
     fn spec_line4b() {
         let word = "haegwjzuvuypxxyu";
-        assert!(!nice(CensorTest::zero(), word));
-        assert!(!nice(Santa::zero(), word));
+        assert!(naughty(CensorTest::zero(), word));
+        assert!(naughty(Santa::zero(), word));
     }
 
     #[test]
     fn spec_line5() {
         let word = "dvszwmarrgswjxmb";
-        assert!(!nice(Vowels::zero(), word));
-        assert!(!nice(Santa::zero(), word));
+        assert!(naughty(Vowels::zero(), word));
+        assert!(naughty(Santa::zero(), word));
     }
 
     #[test]
@@ -382,10 +384,10 @@ mod test {
         let z = fast_santa();
         assert!(nice(z.clone(), "ugknbfddgicrmopn"));
         assert!(nice(z.clone(), "aaa"));
-        assert!(!nice(z.clone(), "jchzalrnumimnmhp"));
-        assert!(!nice(z.clone(), "haegwjzuvuyypxyu"));
-        assert!(!nice(z.clone(), "haegwjzuvuypxxyu"));
-        assert!(!nice(z.clone(), "dvszwmarrgswjxmb"));
+        assert!(naughty(z.clone(), "jchzalrnumimnmhp"));
+        assert!(naughty(z.clone(), "haegwjzuvuyypxyu"));
+        assert!(naughty(z.clone(), "haegwjzuvuypxxyu"));
+        assert!(naughty(z.clone(), "dvszwmarrgswjxmb"));
     }
 
     #[test]
@@ -407,11 +409,11 @@ mod test {
         let z = DoubleTrouble::zero();
         assert!(nice(z.clone(), "xyxy"));
         assert!(nice(z.clone(), "aabcdefgaa"));
-        assert!(!nice(z.clone(), "aaa"));
+        assert!(naughty(z.clone(), "aaa"));
         assert!(nice(z.clone(), "qjhvhtzxzqqjkmpb"));
         assert!(nice(z.clone(), "xxyxx"));
         assert!(nice(z.clone(), "uurcxstgmygtbstg"));
-        assert!(!nice(z.clone(), "ieodomkazucvgmuy"));
+        assert!(naughty(z.clone(), "ieodomkazucvgmuy"));
     }
 
     #[test]
@@ -422,7 +424,7 @@ mod test {
         assert!(nice(z.clone(), "aaa"));
         assert!(nice(z.clone(), "qjhvhtzxzqqjkmpb"));
         assert!(nice(z.clone(), "xxyxx"));
-        assert!(!nice(z.clone(), "uurcxstgmygtbstg"));
+        assert!(naughty(z.clone(), "uurcxstgmygtbstg"));
         assert!(nice(z.clone(), "ieodomkazucvgmuy"));
     }
 
@@ -431,8 +433,8 @@ mod test {
         let z = new_santa();
         assert!(nice(z.clone(), "qjhvhtzxzqqjkmpb"));
         assert!(nice(z.clone(), "xxyxx"));
-        assert!(!nice(z.clone(), "uurcxstgmygtbstg"));
-        assert!(!nice(z.clone(), "ieodomkazucvgmuy"));
+        assert!(naughty(z.clone(), "uurcxstgmygtbstg"));
+        assert!(naughty(z.clone(), "ieodomkazucvgmuy"));
     }
 }
 
