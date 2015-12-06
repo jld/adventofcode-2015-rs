@@ -230,6 +230,35 @@ impl Scanner for DoubleTrouble {
 }
 
 #[derive(PartialEq, Eq, Hash, Clone, Debug)]
+enum Camel {
+    Starting,
+    Accelerating(char),
+    Foraging(char, char),
+    Resting,
+}
+impl ZScanner for Camel {
+    fn zero() -> Camel {
+        Camel::Starting
+    }
+}
+impl Scanner for Camel {
+    fn step(self, c: char) -> Camel {
+        match self {
+            Camel::Starting => Camel::Accelerating(c),
+            Camel::Accelerating(b) => Camel::Foraging(b, c),
+            Camel::Foraging(a, b) if a != c => Camel::Foraging(b, c),
+            _ => Camel::Resting
+        }
+    }
+    fn nice(&self) -> bool {
+        match *self {
+            Camel::Resting => true,
+            _ => false
+        }
+    }
+}
+
+#[derive(PartialEq, Eq, Hash, Clone, Debug)]
 struct Both<S: Scanner, T: Scanner>(S, T);
 impl<S: ZScanner, T: ZScanner> ZScanner for Both<S, T> {
     fn zero() -> Both<S, T> {
@@ -286,7 +315,7 @@ pub fn main() {
 #[cfg(test)]
 mod test {
     use super::{Scanner, ZScanner, Vowels, Doubled, Censor, Santa, Both, Tabulate,
-                DoubleTrouble, nice, fast_santa};
+                DoubleTrouble, Camel, nice, fast_santa};
 
     struct Oprah;
     impl ZScanner for Oprah {
@@ -378,6 +407,18 @@ mod test {
         assert!(nice(z.clone(), "xxyxx"));
         assert!(nice(z.clone(), "uurcxstgmygtbstg"));
         assert!(!nice(z.clone(), "ieodomkazucvgmuy"));
+    }
+
+    #[test]
+    fn cm_spec() {
+        let z = Camel::zero();
+        assert!(nice(z.clone(), "xyx"));
+        assert!(nice(z.clone(), "abcdefeghi"));
+        assert!(nice(z.clone(), "aaa"));
+        assert!(nice(z.clone(), "qjhvhtzxzqqjkmpb"));
+        assert!(nice(z.clone(), "xxyxx"));
+        assert!(!nice(z.clone(), "uurcxstgmygtbstg"));
+        assert!(nice(z.clone(), "ieodomkazucvgmuy"));
     }
 }
 
