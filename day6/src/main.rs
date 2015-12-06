@@ -8,6 +8,13 @@ type Area = u64;
 struct Rect { xmin: Coord, ymin: Coord, xmax: Coord, ymax: Coord }
 
 impl Rect {
+    fn new(xymin: (Coord, Coord), xymax: (Coord, Coord)) -> Rect {
+        let (xmin, ymin) = xymin;
+        let (xmax, ymax) = xymax;
+        assert!(xmin <= xmax);
+        assert!(ymin <= ymax);
+        Rect { xmin: xmin, xmax: xmax, ymin: ymin, ymax: ymax }
+    }
     fn xrange(self) -> Range<usize> { (self.xmin as usize)..(self.xmax as usize + 1) }
     fn yrange(self) -> Range<usize> { (self.ymin as usize)..(self.ymax as usize + 1) }
     fn area(self) -> Area { self.xrange().len() as Area * self.yrange().len() as Area }
@@ -146,9 +153,9 @@ mod test {
     fn run_case(flat: &FlatCase) {
         let mut cmds = Vec::new();
         let mut rects = Vec::new();
-        for &(cmd, (xmin, ymin), (xmax, ymax), maybe_exp) in flat {
+        for &(cmd, xymin, xymax, maybe_exp) in flat {
             cmds.push(cmd);
-            rects.push(Rect { xmin: xmin, xmax: xmax, ymin: ymin, ymax: ymax });
+            rects.push(Rect::new(xymin, xymax));
             let actual_simple = compute_simple(&cmds, &rects);
             if let Some(expected) = maybe_exp {
                 assert!(actual_simple == expected,
