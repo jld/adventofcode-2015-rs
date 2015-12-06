@@ -1,5 +1,9 @@
 use std::cmp::{min,max};
+use std::error::Error;
+use std::fmt;
+use std::num;
 use std::ops::Range;
+use std::str::FromStr;
 
 type Coord = u16;
 type Area = u64;
@@ -141,10 +145,129 @@ fn compute_simple(cmds: &[Cmd], rects: &[Rect]) -> Area {
           .fold(0, |a, n| a + n)
 }
 
+#[derive(Debug)]
+enum ParseError {
+    EOL,
+    ExtraJunk(String),
+    BadVerb(String),
+    BadState(String),
+    BadPrep(String),
+    CommaFail(String),
+    IntFail(String, num::ParseIntError),
+}
+impl fmt::Display for ParseError {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            ParseError::EOL =>
+                write!(f, "unexpected end of line"),
+            ParseError::ExtraJunk(ref junk) =>
+                write!(f, "unexpected words {:?} after command", junk),
+            ParseError::BadVerb(ref verb) =>
+                write!(f, "unrecognized verb {:?}; expected \"toggle\" or \"turn\"", verb),
+            ParseError::BadState(ref state) =>
+                write!(f, "unrecognized state {:?}; expected \"on\" or \"off\"", state),
+            ParseError::BadPrep(ref prep) =>
+                write!(f, "unrecognized preposition {:?}; expected \"through\"", prep),
+            ParseError::CommaFail(ref token) =>
+                write!(f, "expected comma-separated pair; got {:?}", token),
+            ParseError::IntFail(ref token, ref pie) =>
+                write!(f, "invalid number {:?}: {}", token, pie),
+        }
+    }
+}
+impl Error for ParseError {
+    fn cause(&self) -> Option<&Error> {
+        match *self {
+            ParseError::IntFail(_, ref ierr) => Some(ierr),
+            _ => None
+        }
+    }
+    fn description(&self) -> &str {
+        match *self {
+            ParseError::EOL => "unexpected end of line",
+            ParseError::ExtraJunk(_) => "unexpected trailing words",
+            ParseError::BadVerb(_) => "unrecognized verb",
+            ParseError::BadState(_) => "unrecognized light state",
+            ParseError::BadPrep(_) => "unrecognized preposition",
+            ParseError::CommaFail(_) => "not a comma-separated pair",
+            ParseError::IntFail(_, ref pie) => pie.description(),
+        }
+    }
+}
+
+fn parse_cmd<'l, 'w, I>(words: &'l mut I) -> Result<Cmd, ParseError>
+    where I: Iterator<Item=&'w str> {
+    match words.next() {
+        Some("toggle") => Ok(Cmd::Toggle),
+        Some("turn") => match words.next() {
+            Some("on") => Ok(Cmd::TurnOn),
+            Some("off") => Ok(Cmd::TurnOff),
+            Some(huh) => Err(ParseError::BadState(huh.to_owned())),
+            None => Err(ParseError::EOL),
+        },
+        Some(huh) => Err(ParseError::BadVerb(huh.to_owned())),
+        None => Err(ParseError::EOL),
+    }
+}
+fn parse_prep<'l, 'w, I>(words: &'l mut I) -> Result<(), ParseError>
+    where I: Iterator<Item=&'w str> {
+    match words.next() {
+        Some("through") => Ok(()),
+        Some(huh) => Err(ParseError::BadPrep(huh.to_owned())),
+        None => Err(ParseError::EOL),
+    }
+}
+fn parse_coord<'l, 'w, I>(words: &'l mut I) -> Result<Coord, ParseError>
+    where I: Iterator<Item=&'w str> {
+    if let Some(token) = words.next() {
+        Coord::from_str(token).map_err(|ie| ParseError::IntFail(token.to_owned(), ie))
+    } else {
+        Err(ParseError::EOL)
+    }
+}
+fn parse_point<'l, 'w, I>(words: &'l mut I) -> Result<(Coord, Coord), ParseError>
+    where I: Iterator<Item=&'w str> {
+    if let Some(token) = words.next() {
+        let mut subtoks = token.split(',');
+        let emap = |err| { match err {
+            ParseError::EOL => ParseError::CommaFail(token.to_owned()),
+            _ => err
+        }};
+        let x = try!(parse_coord(&mut subtoks).map_err(&emap));
+        let y = try!(parse_coord(&mut subtoks).map_err(&emap));
+        if subtoks.next().is_none() {
+            Ok((x, y))
+        } else {
+            Err(ParseError::CommaFail(token.to_owned()))
+        }
+    } else {
+        Err(ParseError::EOL)
+    }
+}
+fn parse_eol<'l, 'w, I>(words: &mut I) -> Result<(), ParseError>
+    where I: Iterator<Item=&'w str> {
+    let stuff: Vec<_> = words.collect();
+    if stuff.len() > 0 {
+        Err(ParseError::ExtraJunk(stuff.join(" ")))
+    } else {
+        Ok(())
+    }
+}
+fn parse(line: &str) -> Result<(Cmd, Rect), ParseError> {
+    let mut words = line.split(char::is_whitespace).filter(|s| s.len() > 0);
+    let cmd = try!(parse_cmd(&mut words));
+    let xymin = try!(parse_point(&mut words));
+    try!(parse_prep(&mut words));
+    let xymax = try!(parse_point(&mut words));
+    try!(parse_eol(&mut words));
+    Ok((cmd, Rect::new(xymin, xymax)))
+}
+
+
 #[cfg(test)]
 mod test {
     extern crate rand;
-    use super::{compute, compute_simple, Coord, Area, Cmd, Rect};
+    use super::{compute, compute_simple, Coord, Area, Cmd, Rect, parse};
     use self::rand::{Rng,SeedableRng};
     type Rand = self::rand::XorShiftRng;
 
@@ -240,5 +363,22 @@ mod test {
             }
             len += len/2 + 1;
         }
+    }
+
+    #[test]
+    fn example_area() {
+        assert_eq!(Rect::new((0, 0), (999, 999)).area(), 1000000);
+        assert_eq!(Rect::new((0, 0), (999, 0)).area(), 1000);
+        assert_eq!(Rect::new((499, 499), (500, 500)).area(), 4);
+    }
+
+    #[test]
+    fn parse_examples() {
+        assert_eq!(parse("turn on 0,0 through 999,999").unwrap(),
+                   (Cmd::TurnOn, Rect::new((0, 0), (999, 999))));
+        assert_eq!(parse("toggle 0,0 through 999,0").unwrap(),
+                   (Cmd::Toggle, Rect::new((0, 0), (999, 0))));
+        assert_eq!(parse("turn off 499,499 through 500,500").unwrap(),
+                   (Cmd::TurnOff, Rect::new((499, 499), (500, 500))));
     }
 }
