@@ -1,0 +1,5 @@
+[package]
+name = "day6"
+version = "0.1.0"
+authors = ["Jed Davis <jld@panix.com>"]
+exclude = ["scribblings/**/*"]
