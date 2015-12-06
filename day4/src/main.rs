@@ -141,12 +141,12 @@ mod test {
         assert!(!zpfx("abcdef298", 3));
     }
 
-    #[test]
+    #[test] #[ignore]
     fn slow_spec_1() {
         assert_eq!(compute("abcdef", 5), 609043);
     }
 
-    #[test]
+    #[test] #[ignore]
     fn slow_spec_2() {
         assert_eq!(compute("pqrstuv", 5), 1048970);
     }

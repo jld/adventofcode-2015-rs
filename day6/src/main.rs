@@ -213,11 +213,10 @@ mod test {
         }
     }
 
-    #[test]
+    #[test] #[ignore]
     fn randomly() {
-        // TODO, maybe: dial up the amount of testing for test --release.
-        const LEN_MAX: usize = 50;
-        const TESTS: usize = 25;
+        const LEN_MAX: usize = 100;
+        const TESTS: usize = 100;
 
         let mut rng = Rand::from_seed([17, 17, 17, 17]);
         let mut len = 1;
