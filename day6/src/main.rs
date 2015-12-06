@@ -121,30 +121,52 @@ fn compute(cmds: &[Cmd], rects: &[Rect]) -> Area {
     area
 }
 
-fn compute_simple(cmds: &[Cmd], rects: &[Rect]) -> Area {
+trait Light: Clone {
+    fn zero() -> Self;
+    fn turn_off(&mut self);
+    fn turn_on(&mut self);
+    fn toggle(&mut self);
+    fn value(&self) -> Area;
+}
+impl Light for bool {
+    fn zero() -> bool { false }
+    fn turn_off(&mut self) { *self = false; }
+    fn turn_on(&mut self) { *self = true; }
+    fn toggle(&mut self) { *self = !*self; }
+    fn value(&self) -> Area { if *self { 1 } else { 0 } }
+}
+impl Light for u16 {
+    fn zero() -> u16 { 0 }
+    fn turn_off(&mut self) { *self = self.saturating_sub(1); }
+    fn turn_on(&mut self) { *self = self.checked_add(1).expect("overflow!"); }
+    fn toggle(&mut self) { *self = self.checked_add(2).expect("overflow!"); }
+    fn value(&self) -> Area { *self as Area }
+}
+
+fn compute_gen<L: Light>(cmds: &[Cmd], rects: &[Rect]) -> Area {
     if cmds.len() == 0 {
         return 0;
     }
     let bnd = rects.iter().skip(1).fold(rects[0], |ra, &rb| ra.merge(rb));
-    let mut lights = vec![vec![false; bnd.xrange().len()]; bnd.yrange().len()];
+    let mut lights = vec![vec![L::zero(); bnd.xrange().len()]; bnd.yrange().len()];
     for i in 0..cmds.len() {
         let r = rects[i];
         for y in r.yrange() {
             for x in r.xrange() {
                 let light = &mut lights[y - bnd.ymin as usize][x - bnd.xmin as usize];
                 match cmds[i] {
-                    Cmd::TurnOff => *light = false,
-                    Cmd::TurnOn => *light = true,
-                    Cmd::Toggle => *light = !*light,
+                    Cmd::TurnOff => light.turn_off(),
+                    Cmd::TurnOn => light.turn_on(),
+                    Cmd::Toggle => light.toggle(),
                 }
             }
         }
     }
     lights.iter()
           .map(|row| row.iter()
-                        .map(|&light| if light { 1 } else { 0 })
-                        .fold(0, |a, n| a + n))
-          .fold(0, |a, n| a + n)
+                        .map(L::value)
+                        .fold(0 as Area, |a, n| a.checked_add(n).expect("overflow!")))
+          .fold(0 as Area, |a, n| a.checked_add(n).expect("overflow!"))
 }
 
 #[derive(Debug)]
@@ -268,11 +290,14 @@ fn parse(line: &str) -> Result<(Cmd, Rect), ParseError> {
 pub fn main() {
     let argv1 = env::args().nth(1);
     let compute = &compute as &Fn(&[Cmd], &[Rect]) -> Area;
-    let compute_simple = &compute_simple as &Fn(&[Cmd], &[Rect]) -> Area;
+    let compute_simple = &compute_gen::<bool> as &Fn(&[Cmd], &[Rect]) -> Area;
+    let compute_nordic = &compute_gen::<u16> as &Fn(&[Cmd], &[Rect]) -> Area;
     let compute_fn;
+    let mut nordicp = false;
     match argv1.as_ref().map(|s| s as &str /* Sigh. */).unwrap_or("fast") {
         "fast" => compute_fn = compute,
         "slow" => compute_fn = compute_simple,
+        "nordic" => { compute_fn = compute_nordic; nordicp = true },
         huh => panic!("unknown command {:?}", huh)
     };
     let stdin = stdin();
@@ -287,13 +312,17 @@ pub fn main() {
         rects.push(rect);
     }
     let lights = compute_fn(&cmds, &rects);
-    println!("{} light{} lit.", lights, if lights == 1 { " is" } else { "s are" });
+    if nordicp {
+        println!("Total brightness is {}.", lights);
+    } else {
+        println!("{} light{} lit.", lights, if lights == 1 { " is" } else { "s are" });
+    }
 }
 
 #[cfg(test)]
 mod test {
     extern crate rand;
-    use super::{compute, compute_simple, Coord, Area, Cmd, Rect, parse};
+    use super::{compute, compute_gen, Coord, Area, Cmd, Rect, parse};
     use self::rand::{Rng,SeedableRng};
     type Rand = self::rand::XorShiftRng;
 
@@ -305,7 +334,7 @@ mod test {
         for &(cmd, xymin, xymax, maybe_exp) in flat {
             cmds.push(cmd);
             rects.push(Rect::new(xymin, xymax));
-            let actual_simple = compute_simple(&cmds, &rects);
+            let actual_simple = compute_gen::<bool>(&cmds, &rects);
             if let Some(expected) = maybe_exp {
                 assert!(actual_simple == expected,
                         "compute_simple failure: got {}; expected {}; cmds={:?} rects={:?}",
@@ -338,9 +367,9 @@ mod test {
 
     #[test]
     fn example1() {
-        run_case(&[(Cmd::TurnOn, (0, 0), (999, 999), Some(1000000))]);
+        run_case(&[(Cmd::TurnOn, (0, 0), (999, 999), Some(1000_000))]);
         run_case(&[(Cmd::TurnOn, (0, 0), (9, 9), Some(100)),
-                   (Cmd::TurnOn, (0, 0), (999, 999), Some(1000000))]);
+                   (Cmd::TurnOn, (0, 0), (999, 999), Some(1000_000))]);
     }
 
     #[test]
@@ -393,7 +422,7 @@ mod test {
 
     #[test]
     fn example_area() {
-        assert_eq!(Rect::new((0, 0), (999, 999)).area(), 1000000);
+        assert_eq!(Rect::new((0, 0), (999, 999)).area(), 1000_000);
         assert_eq!(Rect::new((0, 0), (999, 0)).area(), 1000);
         assert_eq!(Rect::new((499, 499), (500, 500)).area(), 4);
     }
@@ -464,5 +493,11 @@ mod test {
     #[test] #[should_panic(expected="parse integer from empty string")]
     fn parse_fail_emptynum() {
         panic!("{}", parse("turn on 0, through 999,999").unwrap_err());
+    }
+
+    #[test]
+    fn nordic_examples() {
+        assert_eq!(compute_gen::<u16>(&[Cmd::TurnOn], &[Rect::new((0, 0), (0, 0))]), 1);
+        assert_eq!(compute_gen::<u16>(&[Cmd::Toggle], &[Rect::new((0, 0), (999, 999))]), 2000_000);
     }
 }
