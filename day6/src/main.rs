@@ -136,7 +136,10 @@ fn compute_simple(cmds: &[Cmd], rects: &[Rect]) -> Area {
 
 #[cfg(test)]
 mod test {
+    extern crate rand;
     use super::{compute, compute_simple, Coord, Area, Cmd, Rect};
+    use self::rand::{Rng,SeedableRng};
+    type Rand = self::rand::XorShiftRng;
 
     type FlatCase = [(Cmd, (Coord, Coord), (Coord, Coord), Option<Area>)];
 
@@ -198,5 +201,38 @@ mod test {
                    (Cmd::TurnOff, (499, 499), (500, 500), Some(6))]);
         run_case(&[(Cmd::TurnOn, (498, 498), (499, 501), Some(8)),
                    (Cmd::TurnOff, (499, 499), (500, 500), Some(6))]);
+    }
+
+    fn random_range(rng: &mut Rand, bmin: Coord, bmax: Coord) -> (Coord, Coord) {
+        loop {
+            let cmin = rng.gen_range(bmin as usize, bmax as usize + 1) as Coord;
+            let cmax = rng.gen_range(bmin as usize, bmax as usize + 1) as Coord;
+            if cmin <= cmax {
+                return (cmin, cmax);
+            }
+        }
+    }
+
+    #[test]
+    fn randomly() {
+        // TODO, maybe: dial up the amount of testing for test --release.
+        const LEN_MAX: usize = 50;
+        const TESTS: usize = 25;
+
+        let mut rng = Rand::from_seed([17, 17, 17, 17]);
+        let mut len = 1;
+        while len <= LEN_MAX {
+            for _ in 0..TESTS {
+                let mut case = Vec::new();
+                for _ in 0..len {
+                    let cmd = *rng.choose(&[Cmd::TurnOff, Cmd::TurnOn, Cmd::Toggle]).unwrap();
+                    let (xmin, xmax) = random_range(&mut rng, 0, 99);
+                    let (ymin, ymax) = random_range(&mut rng, 0, 99);
+                    case.push((cmd, (xmin, ymin), (xmax, ymax), None));
+                }
+                run_case(&case);
+            }
+            len += len/2 + 1;
+        }
     }
 }
