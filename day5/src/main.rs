@@ -313,6 +313,7 @@ pub fn main() {
         "dump" => dump(),
         "slow" => checker(slow_santa()),
         "fast" => checker(fast_santa()),
+        "v2" => checker(new_santa()),
         huh => panic!("unknown command {}", huh)
     }
 }
