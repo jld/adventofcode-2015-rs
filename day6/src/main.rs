@@ -1,6 +1,8 @@
 use std::cmp::{min,max};
 use std::error::Error;
+use std::env;
 use std::fmt;
+use std::io::{stdin, BufRead};
 use std::num;
 use std::ops::Range;
 use std::str::FromStr;
@@ -263,6 +265,30 @@ fn parse(line: &str) -> Result<(Cmd, Rect), ParseError> {
     Ok((cmd, Rect::new(xymin, xymax)))
 }
 
+pub fn main() {
+    let argv1 = env::args().nth(1);
+    let compute = &compute as &Fn(&[Cmd], &[Rect]) -> Area;
+    let compute_simple = &compute_simple as &Fn(&[Cmd], &[Rect]) -> Area;
+    let compute_fn;
+    match argv1.as_ref().map(|s| s as &str /* Sigh. */).unwrap_or("fast") {
+        "fast" => compute_fn = compute,
+        "slow" => compute_fn = compute_simple,
+        huh => panic!("unknown command {:?}", huh)
+    };
+    let stdin = stdin();
+    let mut cmds = Vec::new();
+    let mut rects = Vec::new();
+    for (num, line) in stdin.lock().lines().enumerate() {
+        let line = line.expect("I/O error reading stdin");
+        let (cmd, rect) = parse(&line).unwrap_or_else(|err| {
+            panic!("{} on input line {}", err, num)
+        });
+        cmds.push(cmd);
+        rects.push(rect);
+    }
+    let lights = compute_fn(&cmds, &rects);
+    println!("{} light{} lit.", lights, if lights == 1 { " is" } else { "s are" });
+}
 
 #[cfg(test)]
 mod test {
