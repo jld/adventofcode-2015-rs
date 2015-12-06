@@ -1,0 +1,6 @@
+[package]
+name = "day4"
+version = "0.1.0"
+authors = ["Jed Davis <jld@panix.com>"]
+[dependencies]
+md5 = "0.1.1"
