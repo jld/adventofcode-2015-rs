@@ -1,4 +1,4 @@
-use generic::{Expr,ExprMap,Env};
+use generic::{Expr,ExprMap};
 
 pub type Signal = u16;
 pub enum Gate<Ident> {
@@ -12,15 +12,15 @@ pub enum Gate<Ident> {
 impl<Ident> Expr for Gate<Ident> {
     type Ident = Ident;
     type Value = Signal;
-    fn eval<En>(&self, env: &En) -> Result<Self::Value, En::Error>
-        where En: Env<Ident=Self::Ident, Value=Self::Value> {
+    fn eval<Error, F>(&self, env: F) -> Result<Self::Value, Error>
+        where F: Fn(&Self::Ident) -> Result<Self::Value, Error> {
         Ok(match *self {
             Gate::Imm(val) => val,
-            Gate::Not(ref id) => { !try!(env.get(id)) },
-            Gate::And(ref id0, ref id1) => try!(env.get(id0)) & try!(env.get(id1)),
-            Gate::Or(ref id0, ref id1) => try!(env.get(id0)) | try!(env.get(id1)),
-            Gate::LShift(ref id, Shift(sh)) => try!(env.get(id)) << sh,
-            Gate::RShift(ref id, Shift(sh)) => try!(env.get(id)) >> sh,
+            Gate::Not(ref id) => { !try!(env(id)) },
+            Gate::And(ref id0, ref id1) => try!(env(id0)) & try!(env(id1)),
+            Gate::Or(ref id0, ref id1) => try!(env(id0)) | try!(env(id1)),
+            Gate::LShift(ref id, Shift(sh)) => try!(env(id)) << sh,
+            Gate::RShift(ref id, Shift(sh)) => try!(env(id)) >> sh,
         })
     }
 }

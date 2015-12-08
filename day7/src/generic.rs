@@ -6,8 +6,8 @@ use std::hash::Hash;
 pub trait Expr {
     type Ident;
     type Value;
-    fn eval<En>(&self, env: &En) -> Result<Self::Value, En::Error>
-        where En: Env<Ident=Self::Ident, Value=Self::Value>;
+    fn eval<Error, F>(&self, env: F) -> Result<Self::Value, Error>
+        where F: Fn(&Self::Ident) -> Result<Self::Value, Error>;
 }
 
 pub trait ExprMap<AltId>: Expr {
@@ -16,16 +16,10 @@ pub trait ExprMap<AltId>: Expr {
         where F: FnMut(&Self::Ident) -> AltId;
 }
 
-pub trait Env {
-    type Ident;
-    type Value;
+pub trait Eval<'p, P: ProgramT> {
     type Error: Debug;
-    fn get(&self, id: &Self::Ident) -> Result<Self::Value, Self::Error>;
-}
-
-pub trait Eval<P: ProgramT> {
-    type Error: Debug;
-    fn run(&self, prog: &P) -> Result<<P::Expr as Expr>::Value, Self::Error>;
+    fn new(prog: &'p P) -> Self;
+    fn run(&self, pc: Decl) -> Result<<P::Expr as Expr>::Value, Self::Error>;
 }
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -80,14 +74,19 @@ impl<Ex: ExprMap<Decl>> Linker<Ex>
         self.defns[pid.get()] = Some(pdefn);
         Ok(())
     }
-    pub fn link<BIdent, Prog>(self, entry: &BIdent) -> 
+    pub fn link<BIdent, Prog>(self, entries: &[&BIdent]) ->
         Result<Program<Ex::AltExpr, Ex::Ident>, LinkerError<Ex::Ident>>
         where BIdent: Eq + Hash + ToOwned<Owned=Ex::Ident>,
               Ex::Ident: Borrow<BIdent> {
-        let entry = match self.lookup(entry) {
-            None => return Err(LinkerError::UndefinedSymbol(entry.to_owned())),
-            Some(entry) => entry
-        };
+        let mut dentries = Vec::new();
+        for &entry in entries {
+            match self.lookup(entry) {
+                None => {
+                    return Err(LinkerError::UndefinedSymbol(entry.to_owned()));
+                },
+                Some(dentry) => dentries.push(dentry)
+            }
+        }
         let mut text = Vec::new();
         for (i, defn) in self.defns.into_iter().enumerate() {
             match defn {
@@ -96,7 +95,7 @@ impl<Ex: ExprMap<Decl>> Linker<Ex>
             }
         }
         Ok(Program {
-            entry: entry, 
+            entries: dentries.into_boxed_slice(),
             text: text.into_boxed_slice(),
             debug_info: self.pname.into_boxed_slice()
         })
@@ -111,23 +110,23 @@ pub enum LinkerError<Ident> {
 pub trait ProgramT {
     type OuterIdent: Clone + Debug;
     type Expr: Expr<Ident=Decl>;
-    fn entry(&self) -> Decl;
+    fn entries(&self) -> &[Decl];
     fn lookup(&self, id: Decl) -> &Self::Expr;
     fn debug(&self, id: Decl) -> Self::OuterIdent;
     fn len(&self) -> usize;
 }
 pub struct Program<Ex, OuterIdent> {
-    entry: Decl,
+    entries: Box<[Decl]>,
     text: Box<[Ex]>,
     debug_info: Box<[OuterIdent]>,
 }
 impl<Ex, OuterIdent> ProgramT for Program<Ex, OuterIdent>
-    where Ex: Expr<Ident=Decl>, OuterIdent: Clone + Debug {
+        where Ex: Expr<Ident=Decl>, OuterIdent: Clone + Debug {
     type Expr = Ex;
     type OuterIdent = OuterIdent;
     // Could split this into assoc types (wanted by Eval callers) and fns
     // (wanted by Eval impls) but that seems not particularly worth it.
-    fn entry(&self) -> Decl { self.entry }
+    fn entries(&self) -> &[Decl] { self.entries.borrow() } // (except this)
     fn lookup(&self, id: Decl) -> &Ex { &self.text[id.get()] }
     fn debug(&self, id: Decl) -> OuterIdent { self.debug_info[id.get()].clone() }
     fn len(&self) -> usize { self.text.len() }
