@@ -31,4 +31,18 @@ mod test {
         assert_eq!(eval_eager(vec![(Gate::Not(s("a")), s("b")),
                                    (Gate::Imm(0x0123), s("a"))], &["b"]).unwrap(), vec![0xfedc]);
     }
+
+    #[test]
+    fn eager_example() {
+        assert_eq!(eval_eager(vec![(Gate::Imm(123), s("x")),
+                                   (Gate::Imm(456), s("y")),
+                                   (Gate::And(s("x"), s("y")), s("d")),
+                                   (Gate::Or(s("x"), s("y")), s("e")),
+                                   (Gate::lshift(s("x"), 2), s("f")),
+                                   (Gate::rshift(s("y"), 2), s("g")),
+                                   (Gate::Not(s("x")), s("h")),
+                                   (Gate::Not(s("y")), s("i"))],
+                              &["d", "e", "f", "g", "h", "i", "x", "y"]).unwrap(),
+                   vec![72, 507, 492, 114, 65412, 65079, 123, 456]);
+    }
 }

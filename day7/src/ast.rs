@@ -45,3 +45,13 @@ impl Shift {
     fn new(sh: u8) -> Option<Shift> { if sh < 16 { Some(Shift(sh)) } else { None } }
     fn get(&self) -> u8 { self.0 }
 }
+impl<Ident> Gate<Ident> {
+    pub fn lshift(id: Ident, s: u8) -> Self { Self::try_lshift(id, s).unwrap() }
+    pub fn rshift(id: Ident, s: u8) -> Self { Self::try_rshift(id, s).unwrap() }
+    pub fn try_lshift(id: Ident, s: u8) -> Option<Self> {
+        Shift::new(s).map(|sh| Gate::LShift(id, sh))
+    }
+    pub fn try_rshift(id: Ident, s: u8) -> Option<Self> {
+        Shift::new(s).map(|sh| Gate::RShift(id, sh))
+    }
+}
