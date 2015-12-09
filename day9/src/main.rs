@@ -71,6 +71,8 @@ fn search<C: Cmp>(g: &Grid, st: &mut State, be: &mut Best<C>, so_far: Dist) {
         be.add(so_far, &st.stack);
         return;
     }
+    // For C==Shortest this could prune if so_far >= be.dist.
+    // For C==Longest, would need an estimate of largest possible rest-of-path.
     let i = st.top();
     for (j, od) in g[i].iter().enumerate() {
         if let Some(d) = *od {
