@@ -16,9 +16,38 @@ pub fn eval_eager(insns: Vec<Insn>, outputs: &[&str])
     Ok(prog.entries().iter().map(|&entry| eval.run(entry).unwrap()).collect())
 }
 
+pub fn eval_eager_checked(insns: Vec<Insn>, outputs: &[&str])
+                          -> Result<Vec<Signal>, Error<EagerError<String>>> {
+    let mut ld = Linker::new();
+    for (gate, out) in insns {
+        try!(ld.define(&out, gate));
+    }
+    let prog = try!(ld.link(outputs));
+    let eval = CheckedEager::new(&prog);
+    let mut sigs = Vec::new();
+    for &entry in prog.entries() {
+        sigs.push(try!(eval.run(entry)));
+    }
+    Ok(sigs)
+}
+
+
+#[derive(Debug)]
+pub enum Error<EvalError> {
+    EvalError(EvalError),
+    LinkerError(LinkerError<String>),
+}
+impl<E> From<LinkerError<String>> for Error<E> {
+    fn from(e: LinkerError<String>) -> Self { Error::LinkerError(e) }
+}
+macro_rules! impl_from { { $($E:ty),* } => {
+    $(impl From<$E> for Error<$E> { fn from(e: $E) -> Self { Error::EvalError(e) } })*
+}}
+impl_from!{EagerError<String>, LazyError<String>}
+
 #[cfg(test)]
 mod test {
-    use super::eval_eager;
+    use super::{Error, eval_eager, eval_eager_checked};
     use ast::{Signal,Gate,Shift};
 
     fn s(s: &str) -> String { s.to_owned() }
@@ -44,5 +73,15 @@ mod test {
                                    (Gate::Not(s("y")), s("i"))],
                               &["d", "e", "f", "g", "h", "i", "x", "y"]).unwrap(),
                    vec![72, 507, 492, 114, 65412, 65079, 123, 456]);
+    }
+
+    #[test]
+    fn checked_yes() {
+        assert_eq!(eval_eager_checked(vec![(Gate::Imm(0x0123), s("a")),
+                                           (Gate::Not(s("a")), s("b"))], &["b"]).unwrap(),
+                   vec![0xfedc]);
+        assert_eq!(eval_eager_checked(vec![(Gate::Not(s("a")), s("b")),
+                                           (Gate::Imm(0x0123), s("a"))], &["b"]).unwrap(),
+                   vec![0xfedc]);
     }
 }
