@@ -109,9 +109,11 @@ fn compute<C: Cmp>(p: &Problem, cmp: C) -> (Dist, Vec<String>) {
 
 pub fn main() {
     let stdin = stdin();
-    let (dist, places) = compute(&parse(stdin.lock()), Shortest);
-    println!("Path: {}", places.join(" -> "));
-    println!("Length: {}", dist);
+    let prob = parse(stdin.lock());
+    let (sdist, splaces) = compute(&prob, Shortest);
+    println!("Shortest: {}; {}", sdist, splaces.join(" -> "));
+    let (ldist, lplaces) = compute(&prob, Longest);
+    println!("Longest: {}; {}", ldist, lplaces.join(" -> "));
 }
 
 #[cfg(test)]
