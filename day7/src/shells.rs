@@ -16,21 +16,26 @@ pub fn eval_eager(insns: Vec<Insn>, outputs: &[&str])
     Ok(prog.entries().iter().map(|&entry| eval.run(entry).unwrap()).collect())
 }
 
-pub fn eval_eager_checked(insns: Vec<Insn>, outputs: &[&str])
-                          -> Result<Vec<Signal>, Error<EagerError<String>>> {
-    let mut ld = Linker::new();
-    for (gate, out) in insns {
-        try!(ld.define(&out, gate));
+// Okay, I've taken something that wants HKTs and I've been shoving
+// that part around the conceptual graph for days and pretending I can
+// make it go away somehow... and how about no.
+macro_rules! make_eval { {$name:ident<$Hkt:ident> -> $Err:ty} => {
+    pub fn $name(insns: Vec<Insn>, outputs: &[&str])
+                 -> Result<Vec<Signal>, Error<$Err>> {
+        let mut ld = Linker::new();
+        for (gate, out) in insns {
+            try!(ld.define(&out, gate));
+        }
+        let prog = try!(ld.link(outputs));
+        let eval = $Hkt::new(&prog);
+        let mut sigs = Vec::new();
+        for &entry in prog.entries() {
+            sigs.push(try!(eval.run(entry)));
+        }
+        Ok(sigs)
     }
-    let prog = try!(ld.link(outputs));
-    let eval = CheckedEager::new(&prog);
-    let mut sigs = Vec::new();
-    for &entry in prog.entries() {
-        sigs.push(try!(eval.run(entry)));
-    }
-    Ok(sigs)
-}
-
+}}
+make_eval!{eval_eager_checked<CheckedEager> -> EagerError<String>}
 
 #[derive(Debug)]
 pub enum Error<EvalError> {
