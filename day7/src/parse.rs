@@ -18,6 +18,7 @@ fn mkshift(lnum: usize, s: &str) -> Shift {
 
 pub fn parse<B: BufRead>(input: B) -> Vec<Insn> {
     let mut insns = Vec::new();
+    let mut fixups: usize = 0;
     for (lnum, line) in input.lines().enumerate() {
         let line = line.expect("I/O error");
         let mut words: Vec<_> = line
@@ -47,7 +48,6 @@ pub fn parse<B: BufRead>(input: B) -> Vec<Insn> {
             },
             _ => unreachable!()
         };
-        let mut fixups: usize = 0;
         // Let's pretend this justifies making ExprMap so excitingly generic:
         let gate: Gate<String> = expr.idmap(|r| match *r {
             Ok(ref id) => id.clone(),
@@ -93,6 +93,15 @@ mod test {
         assert_eq!(parse("1 AND p -> q".as_bytes()),
                    vec![(Gate::Imm(1), s(" __lit0")),
                         (Gate::And(s(" __lit0"), s("p")), s("q"))]);
+    }
+
+    #[test]
+    fn hax2() {
+        assert_eq!(parse("1 AND p -> q\n1 AND m -> n".as_bytes()),
+                   vec![(Gate::Imm(1), s(" __lit0")),
+                        (Gate::And(s(" __lit0"), s("p")), s("q")),
+                        (Gate::Imm(1), s(" __lit1")),
+                        (Gate::And(s(" __lit1"), s("m")), s("n"))]);
     }
 
     // I could test the error cases... but do I even care at this point?
