@@ -23,22 +23,18 @@ impl State {
         assert!(n < size_of::<Mask>() * 8, "{} points is too many", n);
         State { stack: Vec::new(), mask: !0 << n }
     }
-    fn push(&mut self, i: usize) -> bool {
-        if self.contains(i) {
-            false
-        } else {
+    fn push<'a, F>(&mut self, i: usize, f: F) where F: FnOnce(&mut State) {
+        if !self.contains(i) {
             self.stack.push(i as u8);
             self.mask |= 1 << i;
-            true
+            f(self);
+            let _i = self.stack.pop().unwrap();
+            debug_assert_eq!(_i as usize, i);
+            self.mask &= !(1 << i);
         }
     }
     fn top(&self) -> usize {
         self.stack[self.stack.len() - 1] as usize
-    }
-    fn pop(&mut self) {
-        let i = self.stack.pop().expect("stack underflow") as usize;
-        debug_assert!(self.contains(i));
-        self.mask &= !(1 << i);
     }
     fn len(&self) -> usize {
         self.stack.len()
@@ -78,11 +74,7 @@ fn search<C: Cmp>(g: &Grid, st: &mut State, be: &mut Best<C>, so_far: Dist) {
     let i = st.top();
     for (j, od) in g[i].iter().enumerate() {
         if let Some(d) = *od {
-            if st.push(j) {
-                search(g, st, be, so_far + d);
-                debug_assert!(st.top() == j);
-                st.pop();
-            }
+            st.push(j, |st| search(g, st, be, so_far + d));
         }
     }
 }
@@ -99,9 +91,8 @@ fn compute<C: Cmp>(p: &Problem, cmp: C) -> (Dist, Vec<String>) {
     let mut be = Best::new(cmp);
     for i in 0..g.len() {
         debug_assert!(st.len() == 0);
-        st.push(i);
-        search(&g, &mut st, &mut be, 0);
-        st.pop();
+        debug_assert!(!st.contains(i));
+        st.push(i, |st| search(&g, st, &mut be, 0));
     }
     (be.dist.expect("No path!?"), be.path.iter().map(|i| stab.print(*i as usize)).collect())
 }
