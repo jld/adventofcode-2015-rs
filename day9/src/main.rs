@@ -5,6 +5,7 @@ use std::mem::size_of;
 
 type Dist = usize;
 type Grid = reader::Grid<Dist>;
+type Problem = (reader::SymTab, Grid);
 type Mask = usize;
 
 trait Cmp { fn better(&self, old: Dist, shiny: Dist) -> bool; }
@@ -87,10 +88,14 @@ fn search<C: Cmp>(g: &Grid, st: &mut State, be: &mut Best<C>, so_far: Dist) {
     }
 }
 
-fn compute<B: BufRead, C: Cmp>(input: B, cmp: C) -> (Dist, Vec<String>) {
+fn parse<B: BufRead>(input: B) -> Problem {
     let mut stab = reader::SymTab::new();
-    let g: reader::Grid<usize> = reader::parse(&mut stab, input);
+    let g = reader::parse(&mut stab, input);
+    (stab, g)
+}
 
+fn compute<C: Cmp>(p: &Problem, cmp: C) -> (Dist, Vec<String>) {
+    let &(ref stab, ref g) = p;
     let mut st = State::new(g.len());
     let mut be = Best::new(cmp);
     for i in 0..g.len() {
@@ -104,14 +109,14 @@ fn compute<B: BufRead, C: Cmp>(input: B, cmp: C) -> (Dist, Vec<String>) {
 
 pub fn main() {
     let stdin = stdin();
-    let (dist, places) = compute(stdin.lock(), Shortest);
+    let (dist, places) = compute(&parse(stdin.lock()), Shortest);
     println!("Path: {}", places.join(" -> "));
     println!("Length: {}", dist);
 }
 
 #[cfg(test)]
 mod test {
-    use super::{compute,Shortest,Longest};
+    use super::{compute,parse,Shortest,Longest};
 
     const EXAMPLE: &'static str = "\
         London to Dublin = 464\n\
@@ -120,7 +125,7 @@ mod test {
 
     #[test]
     fn example() {
-        let (dist, path) = compute(EXAMPLE.as_bytes(), Shortest);
+        let (dist, path) = compute(&parse(EXAMPLE.as_bytes()), Shortest);
         assert_eq!(dist, 605);
         assert_eq!(path.len(), 3);
         assert_eq!(path[0], "London");
@@ -130,7 +135,7 @@ mod test {
 
     #[test]
     fn example_long() {
-        let (dist, path) = compute(EXAMPLE.as_bytes(), Longest);
+        let (dist, path) = compute(&parse(EXAMPLE.as_bytes()), Longest);
         assert_eq!(dist, 982);
         assert_eq!(path.len(), 3);
         assert_eq!(path[0], "Dublin");
