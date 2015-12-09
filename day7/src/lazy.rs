@@ -2,9 +2,8 @@ use generic::{Eval,Expr,Decl,ProgramT};
 use std::cell::RefCell;
 use std::marker::PhantomData;
 
-// FIXME bounds
-pub type Lazy<'p, P: ProgramT> = GenLazy<'p, P, SafeMemo<<P::Expr as Expr>::Value>>;
-pub type UnsafeLazy<'p, P: ProgramT> = GenLazy<'p, P, UnsafeMemo<<P::Expr as Expr>::Value>>;
+pub type Lazy<'p, P> = GenLazy<'p, P, SafeMemo<<<P as ProgramT>::Expr as Expr>::Value>>;
+pub type UnsafeLazy<'p, P> = GenLazy<'p, P, UnsafeMemo<<<P as ProgramT>::Expr as Expr>::Value>>;
 
 pub struct GenLazy<'p, P: ProgramT + 'p, M: Memo<<P::Expr as Expr>::Value>> {
     prog: &'p P,
