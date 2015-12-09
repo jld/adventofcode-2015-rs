@@ -45,8 +45,8 @@ impl_from!{EagerError<String>, LazyError<String>, NoError}
 
 #[cfg(test)]
 mod test {
-    use super::{Error, eval_eager, eval_eager_checked, eval_lazy, eval_lazy_unsafe};
-    use ast::{Signal,Gate,Shift};
+    use super::{eval_eager, eval_eager_checked, eval_lazy, eval_lazy_unsafe};
+    use ast::{Gate};
 
     fn s(s: &str) -> String { s.to_owned() }
 

@@ -1,6 +1,7 @@
 use generic::{Expr,ExprMap};
 
 pub type Signal = u16;
+#[derive(PartialEq, Eq, Debug)]
 pub enum Gate<Ident> {
     Imm(Signal),
     Not(Ident),
@@ -39,11 +40,12 @@ impl<Ident, AltId> ExprMap<AltId> for Gate<Ident> {
     }
 }
 
-#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 pub struct Shift(u8);
 impl Shift {
-    fn new(sh: u8) -> Option<Shift> { if sh < 16 { Some(Shift(sh)) } else { None } }
-    fn get(&self) -> u8 { self.0 }
+    pub fn new(sh: u8) -> Option<Shift> { if sh < 16 { Some(Shift(sh)) } else { None } }
+    #[allow(dead_code)]
+    pub fn get(&self) -> u8 { self.0 }
 }
 impl<Ident> Gate<Ident> {
     pub fn lshift(id: Ident, s: u8) -> Self { Self::try_lshift(id, s).unwrap() }
