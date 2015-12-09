@@ -7,6 +7,12 @@ type Dist = usize;
 type Grid = reader::Grid<Dist>;
 type Mask = usize;
 
+trait Cmp { fn better(&self, old: Dist, shiny: Dist) -> bool; }
+struct Shortest;
+impl Cmp for Shortest { fn better(&self, old: Dist, shiny: Dist) -> bool { shiny < old } }
+struct Longest;
+impl Cmp for Longest { fn better(&self, old: Dist, shiny: Dist) -> bool { shiny > old } }
+
 struct State {
     stack: Vec<u8>,
     mask: Mask,
@@ -44,24 +50,26 @@ impl State {
     }
 }
 
-struct Best {
+struct Best<C: Cmp> {
     path: Vec<u8>,
-    dist: Dist,
+    dist: Option<Dist>,
+    cmp: C,
 }
-impl Best {
-    fn new() -> Best { Best {
+impl<C: Cmp> Best<C> {
+    fn new(cmp: C) -> Best<C> { Best {
         path: Vec::new(),
-        dist: !0
+        dist: None,
+        cmp: cmp,
     }}
     fn add(&mut self, dist: Dist, path: &[u8]) {
-        if dist < self.dist {
-            self.dist = dist;
+        if self.dist.as_ref().map_or(true, |&old| self.cmp.better(old, dist)) {
+            self.dist = Some(dist);
             self.path = path.to_owned();
         }
     }
 }
 
-fn search(g: &Grid, st: &mut State, be: &mut Best, so_far: Dist) {
+fn search<C: Cmp>(g: &Grid, st: &mut State, be: &mut Best<C>, so_far: Dist) {
     if st.is_full() {
         be.add(so_far, &st.stack);
         return;
@@ -79,32 +87,31 @@ fn search(g: &Grid, st: &mut State, be: &mut Best, so_far: Dist) {
     }
 }
 
-fn compute<B: BufRead>(b: B) -> (Dist, Vec<String>) {
+fn compute<B: BufRead, C: Cmp>(input: B, cmp: C) -> (Dist, Vec<String>) {
     let mut stab = reader::SymTab::new();
-    let g: reader::Grid<usize> = reader::parse(&mut stab, b);
+    let g: reader::Grid<usize> = reader::parse(&mut stab, input);
 
     let mut st = State::new(g.len());
-    let mut be = Best::new();
+    let mut be = Best::new(cmp);
     for i in 0..g.len() {
         debug_assert!(st.len() == 0);
         st.push(i);
         search(&g, &mut st, &mut be, 0);
         st.pop();
     }
-    assert!(be.dist != !0, "No path!?");
-    (be.dist, be.path.iter().map(|i| stab.print(*i as usize)).collect())
+    (be.dist.expect("No path!?"), be.path.iter().map(|i| stab.print(*i as usize)).collect())
 }
 
 pub fn main() {
     let stdin = stdin();
-    let (dist, places) = compute(stdin.lock());
+    let (dist, places) = compute(stdin.lock(), Shortest);
     println!("Path: {}", places.join(" -> "));
     println!("Length: {}", dist);
 }
 
 #[cfg(test)]
 mod test {
-    use super::compute;
+    use super::{compute,Shortest,Longest};
 
     const EXAMPLE: &'static str = "\
         London to Dublin = 464\n\
@@ -113,11 +120,21 @@ mod test {
 
     #[test]
     fn example() {
-        let (dist, path) = compute(EXAMPLE.as_bytes());
+        let (dist, path) = compute(EXAMPLE.as_bytes(), Shortest);
         assert_eq!(dist, 605);
         assert_eq!(path.len(), 3);
         assert_eq!(path[0], "London");
         assert_eq!(path[1], "Dublin");
+        assert_eq!(path[2], "Belfast");
+    }
+
+    #[test]
+    fn example_long() {
+        let (dist, path) = compute(EXAMPLE.as_bytes(), Longest);
+        assert_eq!(dist, 982);
+        assert_eq!(path.len(), 3);
+        assert_eq!(path[0], "Dublin");
+        assert_eq!(path[1], "London");
         assert_eq!(path[2], "Belfast");
     }
 }
