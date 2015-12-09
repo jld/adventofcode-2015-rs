@@ -1,20 +1,9 @@
 use ast::{Signal,Gate};
-use eager::{Eager,CheckedEager,EagerError};
+use eager::{Eager,CheckedEager,EagerError,NoError};
 use lazy::{Lazy,UnsafeLazy,LazyError};
 use generic::{Linker,LinkerError,Eval,ProgramT};
 
 pub type Insn = (Gate<String>, String);
-
-pub fn eval_eager(insns: Vec<Insn>, outputs: &[&str])
-                  -> Result<Vec<Signal>, LinkerError<String>> {
-    let mut ld = Linker::new();
-    for (gate, out) in insns {
-        try!(ld.define(&out, gate));
-    }
-    let prog = try!(ld.link(outputs));
-    let eval = Eager::new(&prog);
-    Ok(prog.entries().iter().map(|&entry| eval.run(entry).unwrap()).collect())
-}
 
 // Okay, I've taken something that wants HKTs and I've been shoving
 // that part around the conceptual graph for days and pretending I can
@@ -35,7 +24,11 @@ macro_rules! make_eval { {$name:ident<$Hkt:ident> -> $Err:ty} => {
         Ok(sigs)
     }
 }}
+
+make_eval!{eval_eager<Eager> -> NoError}
 make_eval!{eval_eager_checked<CheckedEager> -> EagerError<String>}
+make_eval!{eval_lazy<Lazy> -> LazyError<String>}
+make_eval!{eval_lazy_unsafe<UnsafeLazy> -> LazyError<String>}
 
 #[derive(Debug)]
 pub enum Error<EvalError> {
@@ -48,11 +41,11 @@ impl<E> From<LinkerError<String>> for Error<E> {
 macro_rules! impl_from { { $($E:ty),* } => {
     $(impl From<$E> for Error<$E> { fn from(e: $E) -> Self { Error::EvalError(e) } })*
 }}
-impl_from!{EagerError<String>, LazyError<String>}
+impl_from!{EagerError<String>, LazyError<String>, NoError}
 
 #[cfg(test)]
 mod test {
-    use super::{Error, eval_eager, eval_eager_checked};
+    use super::{Error, eval_eager, eval_eager_checked, eval_lazy, eval_lazy_unsafe};
     use ast::{Signal,Gate,Shift};
 
     fn s(s: &str) -> String { s.to_owned() }
@@ -87,6 +80,26 @@ mod test {
                    vec![0xfedc]);
         assert_eq!(eval_eager_checked(vec![(Gate::Not(s("a")), s("b")),
                                            (Gate::Imm(0x0123), s("a"))], &["b"]).unwrap(),
+                   vec![0xfedc]);
+    }
+
+    #[test]
+    fn lazy_yes() {
+        assert_eq!(eval_lazy(vec![(Gate::Imm(0x0123), s("a")),
+                                           (Gate::Not(s("a")), s("b"))], &["b"]).unwrap(),
+                   vec![0xfedc]);
+        assert_eq!(eval_lazy(vec![(Gate::Not(s("a")), s("b")),
+                                           (Gate::Imm(0x0123), s("a"))], &["b"]).unwrap(),
+                   vec![0xfedc]);
+    }
+
+    #[test]
+    fn lazy_unsafe_yes() {
+        assert_eq!(eval_lazy_unsafe(vec![(Gate::Imm(0x0123), s("a")),
+                                         (Gate::Not(s("a")), s("b"))], &["b"]).unwrap(),
+                   vec![0xfedc]);
+        assert_eq!(eval_lazy_unsafe(vec![(Gate::Not(s("a")), s("b")),
+                                         (Gate::Imm(0x0123), s("a"))], &["b"]).unwrap(),
                    vec![0xfedc]);
     }
 }

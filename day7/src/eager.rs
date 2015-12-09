@@ -11,7 +11,7 @@ impl<'p, P: ProgramT + 'p> Eval<'p, P> for Eager<'p, P> {
     }
 }
 #[derive(Debug)]
-enum NoError { }
+pub enum NoError { }
 
 pub struct CheckedEager<'p, P: ProgramT + 'p> {
     prog: &'p P
