@@ -24,12 +24,12 @@ impl State {
         State { stack: Vec::new(), mask: !0 << n }
     }
     fn push(&mut self, i: usize) -> bool {
-        if self.mask & 1 << i == 0 {
+        if self.contains(i) {
+            false
+        } else {
             self.stack.push(i as u8);
             self.mask |= 1 << i;
             true
-        } else {
-            false
         }
     }
     fn top(&self) -> usize {
@@ -78,8 +78,7 @@ fn search<C: Cmp>(g: &Grid, st: &mut State, be: &mut Best<C>, so_far: Dist) {
     let i = st.top();
     for (j, od) in g[i].iter().enumerate() {
         if let Some(d) = *od {
-            if !st.contains(j) {
-                st.push(j);
+            if st.push(j) {
                 search(g, st, be, so_far + d);
                 debug_assert!(st.top() == j);
                 st.pop();
