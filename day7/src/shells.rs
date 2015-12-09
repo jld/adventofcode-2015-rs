@@ -102,4 +102,10 @@ mod test {
                                          (Gate::Imm(0x0123), s("a"))], &["b"]).unwrap(),
                    vec![0xfedc]);
     }
+
+    // TODO/FIXME/XXX/etc.: Write some tests for the error cases.  I
+    // wrote that code, so it might as well do something.  (Except the
+    // error case for the unchecked eager evaluator hitting a cycle,
+    // because that's a stack overflow and I think those just kill
+    // everything.)
 }

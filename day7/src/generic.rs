@@ -3,6 +3,30 @@ use std::fmt::Debug;
 use std::collections::HashMap;
 use std::hash::Hash;
 
+// Okay, so.  I had a few ideas here:
+//
+// 1. Make the language syntax parametric on identifier type, so the
+//    parser can hand back a Stuff<String> and it can be interned into
+//    Stuff<NewtypedInt>.  Simple enough.
+//
+// 2. Define the associated local semantics independently of the
+//    evaluation strategy, just in terms of an abstract value
+//    environment that might be recursively evaluating things.
+//
+// 3. Make the evaluation strategy also be parameterized over the
+//    language definition.
+//
+// 4. Oh, and have the symbol interning thing also be parametric over
+//    the language.
+//
+// It turns out that that much abstraction starts wanting
+// higher-kinded types *really* quickly.  Trying to shoehorn all this
+// into a form that actually works in Rust 1.x might have turned into
+// a slightly unhealthy obsession, but... it mostly works.
+//
+// If nothing else, I suppose it was a learning experience in using
+// associated types.
+
 pub trait Expr {
     type Ident;
     type Value;
