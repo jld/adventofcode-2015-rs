@@ -1,4 +1,5 @@
 use std::env;
+use std::fmt::Display;
 use std::str::FromStr;
 
 struct RLE<I> where I: Iterator, I::Item: Eq {
@@ -31,38 +32,56 @@ impl<I> Iterator for RLE<I> where I: Iterator, I::Item: Eq {
     }
 }
 
-struct ElfGame {
-    inner: Box<Iterator<Item=(usize, char)>>,
-    buf: Vec<u8>
+struct CharStream {
+    buf: Vec<char>
 }
-impl ElfGame {
-    fn new<I: Iterator<Item=char> + 'static>(i: I) -> ElfGame {
-        ElfGame { inner: Box::new(RLE::new(i)), buf: Vec::new() }
+impl CharStream {
+    fn new() -> CharStream { CharStream { buf: Vec::new() } }
+    fn from(s: String) -> CharStream {
+        let mut cs = CharStream::new();
+        cs.replenish(move || Some(s));
+        cs
     }
-}
-impl Iterator for ElfGame {
-    type Item = char;
-    fn next(&mut self) -> Option<char> {
+    fn replenish<F>(&mut self, f: F) where F: FnOnce() -> Option<String> {
         if self.buf.is_empty() {
-            if let Some((n, c)) = self.inner.next() {
-                let s = format!("{}{}", n, c);
-                let mut b = s.into_bytes();
-                b.reverse();
-                self.buf = b;
+            if let Some(s) = f() {
+                self.buf.extend(s.chars());
+                self.buf.reverse();
             }
         }
-        self.buf.pop().map(|b| b as char)
+    }
+}
+impl Iterator for CharStream {
+    type Item = char;
+    fn next(&mut self) -> Option<char> {
+        self.buf.pop()
     }
 }
 
-fn elf_game_n(s: &str, n: usize) -> ElfGame {
-    assert!(n > 0);
-    let s = s.to_owned();
-    let mut eg = ElfGame::new(s.into_bytes().into_iter().map(|b| b as char));
-    for _ in 1..n {
-        eg = ElfGame::new(eg);
+struct ElfGame<I> where I: Iterator, I::Item: Display + Eq {
+    inner: RLE<I>,
+    buf: CharStream,
+}
+impl<I> ElfGame<I> where I: Iterator, I::Item: Display + Eq {
+    fn new(i: I) -> ElfGame<I> {
+        ElfGame { inner: RLE::new(i), buf: CharStream::new() }
     }
-    eg
+}
+impl<I> Iterator for ElfGame<I> where I: Iterator, I::Item: Display + Eq {
+    type Item = char;
+    fn next(&mut self) -> Option<char> {
+        let ib = &mut self.inner;
+        self.buf.replenish(|| ib.next().map(|(n, c)| format!("{}{}", n, c)));
+        self.buf.next()
+    }
+}
+
+fn elf_game_n(s: &str, n: usize) -> Box<Iterator<Item=char>> {
+    let mut bx: Box<Iterator<Item=char>> = Box::new(CharStream::from(s.to_owned()));
+    for _ in 0..n {
+        bx = Box::new(ElfGame::new(bx));
+    }
+    bx
 }
 
 #[allow(dead_code)]
