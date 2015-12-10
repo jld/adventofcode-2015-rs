@@ -31,9 +31,32 @@ impl<I> Iterator for RLE<I> where I: Iterator, I::Item: Eq {
     }
 }
 
+struct ElfGame {
+    inner: Box<Iterator<Item=(usize, char)>>,
+    buf: Vec<u8>
+}
+impl ElfGame {
+    fn new<I: Iterator<Item=char> + 'static>(i: I) -> ElfGame {
+        ElfGame { inner: Box::new(RLE::new(i)), buf: Vec::new() }
+    }
+}
+impl Iterator for ElfGame {
+    type Item = char;
+    fn next(&mut self) -> Option<char> {
+        if self.buf.is_empty() {
+            if let Some((n, c)) = self.inner.next() {
+                let s = format!("{}{}", n, c);
+                let mut b = s.into_bytes();
+                b.reverse();
+                self.buf = b;
+            }
+        }
+        self.buf.pop().map(|b| b as char)
+    }
+}
+
 fn elf_game(s: &str) -> String {
-    let bits: Vec<_> = RLE::new(s.chars()).map(|(n, c)| format!("{}{}", n, c)).collect();
-    bits.concat()
+    ElfGame::new(s.to_owned().into_bytes().into_iter().map(|b| b as char)).collect()
 }
 
 fn main() {
