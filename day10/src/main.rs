@@ -1,3 +1,6 @@
+use std::env;
+use std::str::FromStr;
+
 struct RLE<I> where I: Iterator, I::Item: Eq {
     inner: I,
     next_thing: Option<I::Item>
@@ -34,7 +37,13 @@ fn elf_game(s: &str) -> String {
 }
 
 fn main() {
-    println!("Hello, world!");
+    let mut argv = env::args().skip(1);
+    let mut thing = argv.next().expect("Usage: day10 <input> [<count>]");
+    let count = argv.next().map(|s| usize::from_str(&s).unwrap()).unwrap_or(40);
+    for _ in 0..count {
+        thing = elf_game(&thing);
+    }
+    println!("Length: {}", thing.len());
 }
 
 #[cfg(test)]
