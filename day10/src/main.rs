@@ -65,18 +65,16 @@ fn elf_game_n(s: &str, n: usize) -> ElfGame {
     eg
 }
 
+#[allow(dead_code)]
 fn elf_game(s: &str) -> String {
     elf_game_n(s, 1).collect()
 }
 
 fn main() {
     let mut argv = env::args().skip(1);
-    let mut thing = argv.next().expect("Usage: day10 <input> [<count>]");
-    let count = argv.next().map(|s| usize::from_str(&s).unwrap()).unwrap_or(40);
-    for _ in 0..count {
-        thing = elf_game(&thing);
-    }
-    println!("Length: {}", thing.len());
+    let thing = argv.next().expect("Usage: day10 <input> [<count>]");
+    let elves = argv.next().map(|s| usize::from_str(&s).unwrap()).unwrap_or(40);
+    println!("Length: {}", elf_game_n(&thing, elves).count());
 }
 
 #[cfg(test)]
