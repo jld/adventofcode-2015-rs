@@ -55,8 +55,18 @@ impl Iterator for ElfGame {
     }
 }
 
+fn elf_game_n(s: &str, n: usize) -> ElfGame {
+    assert!(n > 0);
+    let s = s.to_owned();
+    let mut eg = ElfGame::new(s.into_bytes().into_iter().map(|b| b as char));
+    for _ in 1..n {
+        eg = ElfGame::new(eg);
+    }
+    eg
+}
+
 fn elf_game(s: &str) -> String {
-    ElfGame::new(s.to_owned().into_bytes().into_iter().map(|b| b as char)).collect()
+    elf_game_n(s, 1).collect()
 }
 
 fn main() {
@@ -71,7 +81,7 @@ fn main() {
 
 #[cfg(test)]
 mod test {
-    use super::{RLE, elf_game};
+    use super::{RLE, elf_game, elf_game_n};
 
     fn rle<I: Eq>(v: Vec<I>) -> Vec<(usize, I)> {
         RLE::new(v.into_iter()).collect()
@@ -96,5 +106,11 @@ mod test {
         assert_eq!(elf_game("21"), "1211");
         assert_eq!(elf_game("1211"), "111221");
         assert_eq!(elf_game("111221"), "312211");
+    }
+
+    #[test]
+    fn nested() {
+        let s: String = elf_game_n("1", 5).collect();
+        assert_eq!(s, "312211");
     }
 }
