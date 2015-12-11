@@ -1,3 +1,5 @@
+use std::io::{stdin,BufRead};
+
 fn is_okay(b: u8) -> bool {
     match b as char {
         'i' | 'l' | 'o' => false,
@@ -87,7 +89,11 @@ pub fn nextpass(s: &str) -> String {
 }
 
 pub fn main() {
-    println!("Hello, world!");
+    let stdin = stdin();
+    for line in stdin.lock().lines() {
+        let line = line.expect("I/O error reading stdin");
+        println!("{}", nextpass(&line));
+    }
 }
 
 #[cfg(test)]
