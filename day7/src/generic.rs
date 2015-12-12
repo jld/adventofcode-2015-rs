@@ -40,11 +40,20 @@ pub trait ExprMap<AltId>: Expr {
         where F: FnMut(&Self::Ident) -> AltId;
 }
 
-pub trait Eval<'p, P: ProgramT> {
+pub trait Erroneous<P: ProgramT> {
     type Error: Debug;
-    fn new(prog: &'p P) -> Self;
-    fn run(&self, pc: Decl) -> Result<<P::Expr as Expr>::Value, Self::Error>;
 }
+
+pub trait Strategy<'p, P: ProgramT>: Erroneous<P> {
+    type Eval: Eval<'p, P, Self::Error>;
+    fn load(&self, prog: &'p P) -> Self::Eval;
+}
+
+pub trait Eval<'p, P: ProgramT, E: Debug> {
+    fn run(&self, pc: Decl) -> ProgResult<P, E>;
+}
+
+pub type ProgResult<P, E> = Result<<<P as ProgramT>::Expr as Expr>::Value, E>;
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub struct Decl(usize);

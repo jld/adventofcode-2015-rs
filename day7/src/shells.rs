@@ -1,29 +1,33 @@
 use ast::{Signal,Gate};
 use eager::{Eager,CheckedEager,EagerError,NoError};
 use lazy::{Lazy,UnsafeLazy,LazyError};
-use generic::{Linker,LinkerError,Eval,ProgramT};
+use generic::{Linker,LinkerError,Eval,Program,ProgramT,Strategy,Decl};
 
 pub type Insn = (Gate<String>, String);
 
-// Okay, I've taken something that wants HKTs and I've been shoving
-// that part around the conceptual graph for days and pretending I can
-// make it go away somehow... and how about no.
 macro_rules! make_eval { {$name:ident<$Hkt:ident> -> $Err:ty} => {
     pub fn $name(insns: Vec<Insn>, outputs: &[&str])
                  -> Result<Vec<Signal>, Error<$Err>> {
-        let mut ld = Linker::new();
-        for (gate, out) in insns {
-            try!(ld.define(&out, gate));
-        }
-        let prog = try!(ld.link(outputs));
-        let eval = $Hkt::new(&prog);
-        let mut sigs = Vec::new();
-        for &entry in prog.entries() {
-            sigs.push(try!(eval.run(entry)));
-        }
-        Ok(sigs)
+        gen_eval($Hkt, insns, outputs)
     }
 }}
+
+type Prog = Program<Gate<Decl>, String>;
+
+fn gen_eval<S: for<'p> Strategy<'p, Prog>>(strat: S, insns: Vec<Insn>, outputs: &[&str])
+                                           -> Result<Vec<Signal>, Error<S::Error>> {
+    let mut ld = Linker::new();
+    for (gate, out) in insns {
+        try!(ld.define(&out, gate));
+    }
+    let prog = try!(ld.link(outputs));
+    let eval = strat.load(&prog);
+    let mut sigs = Vec::new();
+    for &entry in prog.entries() {
+        sigs.push(try!(eval.run(entry).map_err(Error::EvalError)));
+    }
+    Ok(sigs)
+}
 
 make_eval!{eval_eager<Eager> -> NoError}
 make_eval!{eval_eager_checked<CheckedEager> -> EagerError<String>}
@@ -38,10 +42,6 @@ pub enum Error<EvalError> {
 impl<E> From<LinkerError<String>> for Error<E> {
     fn from(e: LinkerError<String>) -> Self { Error::LinkerError(e) }
 }
-macro_rules! impl_from { { $($E:ty),* } => {
-    $(impl From<$E> for Error<$E> { fn from(e: $E) -> Self { Error::EvalError(e) } })*
-}}
-impl_from!{EagerError<String>, LazyError<String>, NoError}
 
 #[cfg(test)]
 mod test {
