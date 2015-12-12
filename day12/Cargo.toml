@@ -1,0 +1,6 @@
+[package]
+name = "day12"
+version = "0.1.0"
+authors = ["Jed Davis <jld@panix.com>"]
+[dependencies]
+rustc-serialize = "0.3"
