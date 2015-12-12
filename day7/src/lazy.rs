@@ -2,18 +2,19 @@ use generic::{Eval,Expr,Decl,ProgramT};
 use std::cell::RefCell;
 use std::marker::PhantomData;
 
-pub type Lazy<'p, P> = GenLazy<'p, P, SafeMemo<<<P as ProgramT>::Expr as Expr>::Value>>;
-pub type UnsafeLazy<'p, P> = GenLazy<'p, P, UnsafeMemo<<<P as ProgramT>::Expr as Expr>::Value>>;
+pub type Lazy<'p, P> = GenLazy<'p, P, SafeM>;
+pub type UnsafeLazy<'p, P> = GenLazy<'p, P, UnsafeM>;
 
-pub struct GenLazy<'p, P: ProgramT + 'p, M: Memo<<P::Expr as Expr>::Value>> {
+pub struct GenLazy<'p, P: ProgramT + 'p, M>
+    where M: MemoFlavor<<P::Expr as Expr>::Value> {
     prog: &'p P,
-    memos: Box<[M]>,
+    memos: Box<[M::Memo]>,
 }
-impl<'p, P: ProgramT + 'p, M: Memo<<P::Expr as Expr>::Value>> Eval<'p, P> for GenLazy<'p, P, M>
-    where <P::Expr as Expr>::Value: Clone {
+impl<'p, P: ProgramT + 'p, M> Eval<'p, P> for GenLazy<'p, P, M>
+    where M: MemoFlavor<<P::Expr as Expr>::Value> {
     type Error = LazyError<P::OuterIdent>;
     fn new(prog: &'p P) -> Self {
-        let memos: Vec<_> = (0..prog.len()).map(|_i| M::new()).collect();
+        let memos: Vec<_> = (0..prog.len()).map(|_i| M::Memo::new()).collect();
         GenLazy {
             prog: prog,
             memos: memos.into_boxed_slice(),
@@ -29,6 +30,16 @@ impl<'p, P: ProgramT + 'p, M: Memo<<P::Expr as Expr>::Value>> Eval<'p, P> for Ge
 pub enum LazyError<Ident> {
     Cycle(Ident)
 }
+
+pub trait MemoFlavor<T> { type Memo: Memo<T>; }
+type MemoApply<M, T> = <M as MemoFlavor<T>>::Memo;
+type MemoApplyP<M, P> = MemoApply<M, <<P as ProgramT>::Expr as Expr>::Value>;
+struct NullM;
+impl<T> MemoFlavor<T> for NullM { type Memo = NullMemo<T>; }
+struct UnsafeM;
+impl<T: Clone> MemoFlavor<T> for UnsafeM { type Memo = UnsafeMemo<T>; }
+struct SafeM;
+impl<T: Clone> MemoFlavor<T> for SafeM { type Memo = SafeMemo<T>; }
 
 pub trait Memo<T> {
     fn new() -> Self;
