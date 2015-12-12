@@ -18,56 +18,91 @@ fn json_int_sum(j: &Json) -> i64 {
     }
 }
 
-fn str_json_int_sum(s: &str) -> i64 {
-    json_int_sum(&Json::from_str(s).unwrap())
+fn is_red(j: &Json) -> bool {
+    match *j {
+        Json::String(ref s) => s == "red",
+        _ => false
+    }
+}
+
+fn elf_correction(j: &Json) -> Json {
+    match *j {
+        Json::Object(ref o) => if o.values().any(is_red) {
+            Json::String("elf fail redacted".to_owned())
+        } else {
+            Json::Object(o.iter().map(|(k, v)| (k.clone(), elf_correction(v))).collect())
+        },
+        Json::Array(ref a) =>
+            Json::Array(a.iter().map(elf_correction).collect()),
+        _ => j.clone()
+    }
 }
 
 fn main() {
     let stdin = stdin();
     let mut input = String::new();
     stdin.lock().read_to_string(&mut input).unwrap();
-    println!("Sum of numbers: {}", str_json_int_sum(&input));
+    let j = Json::from_str(&input).unwrap();
+    println!("Sum of numbers: {}", json_int_sum(&j));
+    let ej = elf_correction(&j);
+    println!("With elf correction: {}", json_int_sum(&ej));
 }
 
 #[cfg(test)]
 mod test {
-    use super::str_json_int_sum;
+    use super::{json_int_sum, elf_correction};
+    use rustc_serialize::json::Json;
+
+    fn plain_sum(s: &str) -> i64 {
+        json_int_sum(&Json::from_str(s).unwrap())
+    }
+    fn fixed_sum(s: &str) -> i64 {
+        json_int_sum(&elf_correction(&Json::from_str(s).unwrap()))
+    }
 
     #[test]
     fn examples() {
-        assert_eq!(str_json_int_sum("[1,2,3]"), 6);
-        assert_eq!(str_json_int_sum("{\"a\":2,\"b\":4}"), 6);
-        assert_eq!(str_json_int_sum("[[[3]]]"), 3);
-        assert_eq!(str_json_int_sum("{\"a\":{\"b\":4},\"c\":-1}"), 3);
-        assert_eq!(str_json_int_sum("{\"a\":[-1,1]}"), 0);
-        assert_eq!(str_json_int_sum("[-1,{\"a\":1}]"), 0);
-        assert_eq!(str_json_int_sum("[]"), 0);
-        assert_eq!(str_json_int_sum("{}"), 0);
+        assert_eq!(plain_sum("[1,2,3]"), 6);
+        assert_eq!(plain_sum("{\"a\":2,\"b\":4}"), 6);
+        assert_eq!(plain_sum("[[[3]]]"), 3);
+        assert_eq!(plain_sum("{\"a\":{\"b\":4},\"c\":-1}"), 3);
+        assert_eq!(plain_sum("{\"a\":[-1,1]}"), 0);
+        assert_eq!(plain_sum("[-1,{\"a\":1}]"), 0);
+        assert_eq!(plain_sum("[]"), 0);
+        assert_eq!(plain_sum("{}"), 0);
     }
 
     #[test] #[should_panic(expected = "Unhandled JSON thing")]
     fn float1() {
-        let _ = str_json_int_sum("[1,2.3]");
+        let _ = plain_sum("[1,2.3]");
     }
     #[test] #[should_panic(expected = "Unhandled JSON thing")]
     fn float2() {
-        let _ = str_json_int_sum("[1,2.0]");
+        let _ = plain_sum("[1,2.0]");
     }
-    
+
     #[test]
     fn bignum() {
-        assert_eq!(str_json_int_sum("[4294967296]"), 4294967296);
-        assert_eq!(str_json_int_sum("[-9223372036854775808]"), -9223372036854775808);
-        assert_eq!(str_json_int_sum("[9223372036854775807]"), 9223372036854775807);
-        assert_eq!(str_json_int_sum("[7, 9223372036854775800]"), 9223372036854775807);
+        assert_eq!(plain_sum("[4294967296]"), 4294967296);
+        assert_eq!(plain_sum("[-9223372036854775808]"), -9223372036854775808);
+        assert_eq!(plain_sum("[9223372036854775807]"), 9223372036854775807);
+        assert_eq!(plain_sum("[7, 9223372036854775800]"), 9223372036854775807);
     }
 
     #[test] #[should_panic(expected = "Unhandled JSON thing")]
     fn toobignum() {
-        let _ = str_json_int_sum("[9223372036854775808]");
+        let _ = plain_sum("[9223372036854775808]");
     }
     #[test] #[should_panic(expected = "overflow")]
     fn toobigsum() {
-        let _ = str_json_int_sum("[8, 9223372036854775800]");
+        let _ = plain_sum("[8, 9223372036854775800]");
+    }
+
+    #[test]
+    fn part2() {
+        assert_eq!(fixed_sum("[1,2,3]"), 6);
+        assert_eq!(fixed_sum("[1,{\"c\":\"red\",\"b\":2},3]"), 4);
+        assert_eq!(fixed_sum("{\"d\":\"red\",\"e\":[1,2,3,4],\"f\":5}"), 0);
+        assert_eq!(fixed_sum("[1,\"red\",5]"), 6);
     }
 }
