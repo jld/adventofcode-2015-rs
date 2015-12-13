@@ -1,3 +1,5 @@
+extern crate util;
+
 mod reader;
 
 use std::io::{stdin, BufRead};
