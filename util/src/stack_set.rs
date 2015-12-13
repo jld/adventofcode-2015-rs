@@ -45,6 +45,7 @@ impl<B: BitSet> Deref for StackSet<B> {
 macro_rules! make_impls { { $($ty:ty),* } => {
     $(impl BitSet for $ty {
         type Idx = u8;
+        #[inline]
         fn new(n: usize) -> Option<Self> {
             let bits = size_of::<Self>() * 8;
             if n > bits {
@@ -55,15 +56,19 @@ macro_rules! make_impls { { $($ty:ty),* } => {
                 Some(!0 << n)
             }
         }
+        #[inline]
         fn is_full(&self) -> bool {
             !*self == 0
         }
+        #[inline]
         fn contains(&self, i: u8) -> bool {
             *self & 1 << i != 0
         }
+        #[inline]
         fn set(&mut self, i: u8) {
             *self |= 1 << i
         }
+        #[inline]
         fn clear(&mut self, i: u8) {
             *self &= !(1 << i)
         }
