@@ -33,9 +33,9 @@ fn compute(prob: &Problem) -> (Points, Vec<String>) {
     let &(ref stab, ref grid) = prob;
     let mut st = State::new(grid.len()).expect("too many people");
     let mut be = Best::new(Largest);
-    for i in 0..grid.len() {
-        st.push(i as u8, |st| search(grid, st, &mut be, 0));
-    }
+    // The semantics of the dinner table are invariant under rotation, so
+    // w.l.o.g. seat the first person first.
+    st.push(0 as u8, |st| search(grid, st, &mut be, 0));
     let (points, order) = be.unwrap();
     (points, order.iter().map(|i| stab.print(*i as usize)).collect())
 }
