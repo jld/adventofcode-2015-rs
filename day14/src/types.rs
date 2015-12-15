@@ -50,7 +50,7 @@ macro_rules! def_units {
     }
 }
 
-def_units!{ Scalar, Speed, Dist, Time }
+def_units!{ Scalar, Speed, Dist, Time, Points }
 
 lift_ops!{
     Mul::mul(Speed, Time) -> Dist;
