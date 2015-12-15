@@ -55,4 +55,14 @@ mod tests {
         assert_eq!(comet.distance(Time(1000)), Dist(1120));
         assert_eq!(dancer.distance(Time(1000)), Dist(1056));
     }
+
+    #[test]
+    fn special_case() {
+        let comet = rd("Comet", 14, 10, 127);
+        assert_eq!(comet.distance(Time(5)), Dist(14 * 5));
+        assert_eq!(comet.distance(Time(10)), Dist(14 * 10));
+        assert_eq!(comet.distance(Time(10 + 127)), Dist(14 * 10));
+        assert_eq!(comet.distance(Time(10 + 128)), Dist(14 * 11));
+    }
+        
 }
