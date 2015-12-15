@@ -81,6 +81,9 @@ impl Parser {
         // methods) and that of `caps` itself, which means they can
         // outlive it in order to be returned.  The error message for
         // that is...  not maximally clear.
+        //
+        // (FIXME: what the above paragraph is actually only part of
+        // the problem.)
         let delta = try!(Points::from_str(caps.name("delta").unwrap()));
         let delta = match caps.name("verb").unwrap() {
             "gain" => delta,
