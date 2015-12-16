@@ -78,7 +78,7 @@ fn main() {
             }
         }
     }
-    let (score, soln) = search::exhaustive(&ingrs, 100);
+    let (score, soln) = search::exhaustive(&ingrs, 100, None);
     println!("Maximal cookie score: {}", score);
     for (i, name) in names.iter().enumerate() {
         println!("* {} tsp of {}", soln[i], name);
