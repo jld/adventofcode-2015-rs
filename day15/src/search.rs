@@ -3,25 +3,20 @@ use ::{Stats,Num,Qty};
 
 type Best = best::Best<Num, Vec<Qty>, best::Largest>;
 
-fn eval(stats: &[Stats], qtys: &[Qty]) -> Num {
-    debug_assert_eq!(stats.len(), qtys.len());
-    stats.iter().zip(qtys.iter()).fold(Stats::zero(), |a, (s, q)| a + s.clone()**q).eval()
-}
-
 struct ExhCtx<'s> {
     stats: &'s [Stats],
     qtys: Vec<Qty>,
     best: Best,
 }
 
-fn exh_recur(ctx: &mut ExhCtx, i: usize, left: Qty) {
+fn exh_recur(ctx: &mut ExhCtx, i: usize, left: Qty, acc: Stats) {
     if i == 0 {
         ctx.qtys[i] = left;
-        ctx.best.add(eval(ctx.stats, &ctx.qtys), &ctx.qtys);
+        ctx.best.add((acc + ctx.stats[i].clone() * left).eval(), &ctx.qtys);
     } else {
         for this in 0..(left+1) {
             ctx.qtys[i] = this;
-            exh_recur(ctx, i - 1, left - this);
+            exh_recur(ctx, i - 1, left - this, acc.clone() + ctx.stats[i].clone() * this);
         }
     }
 }
@@ -33,7 +28,7 @@ pub fn exhaustive(stats: &[Stats], total: Qty) -> (Num, Vec<Qty>) {
         qtys: vec![!0; stats.len()],
         best: Best::new(best::Largest),
     };
-    exh_recur(&mut ctx, stats.len() - 1, total);
+    exh_recur(&mut ctx, stats.len() - 1, total, Stats::zero());
     ctx.best.unwrap()
 }
 
