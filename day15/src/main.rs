@@ -78,9 +78,19 @@ fn main() {
             }
         }
     }
-    let (score, soln) = search::exhaustive(&ingrs, 100, None);
-    println!("Maximal cookie score: {}", score);
-    for (i, name) in names.iter().enumerate() {
-        println!("* {} tsp of {}", soln[i], name);
+    {
+        let (score, soln) = search::exhaustive(&ingrs, 100, None);
+        println!("Maximal cookie score, freestyle: {}", score);
+        for (i, name) in names.iter().enumerate() {
+            println!("* {} tsp of {}", soln[i], name);
+        }
+    }
+    println!("");
+    {
+        let (score, soln) = search::exhaustive(&ingrs, 100, Some(500));
+        println!("Maximal cookie score, calorie-counting: {}", score);
+        for (i, name) in names.iter().enumerate() {
+            println!("* {} tsp of {}", soln[i], name);
+        }
     }
 }
