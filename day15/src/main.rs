@@ -1,10 +1,10 @@
-extern crate combine;
 extern crate util;
 
 mod parser;
 
 pub type Num = i64;
 
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Stats {
     pub capacity: Num,
     pub durability: Num,
