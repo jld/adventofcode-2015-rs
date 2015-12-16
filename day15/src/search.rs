@@ -8,28 +8,39 @@ fn eval(stats: &[Stats], qtys: &[Qty]) -> Num {
     stats.iter().zip(qtys.iter()).fold(Stats::zero(), |a, (s, q)| a + s.clone()**q).eval()
 }
 
-fn exh_recur(stats: &[Stats], qtys: &mut[Qty], i: usize, left: Qty, be: &mut Best) {
+struct ExhCtx<'s> {
+    stats: &'s [Stats],
+    qtys: Vec<Qty>,
+    best: Best,
+}
+
+fn exh_recur(ctx: &mut ExhCtx, i: usize, left: Qty) {
     if i == 0 {
-        qtys[i] = left;
-        be.add(eval(stats, qtys), qtys);
+        ctx.qtys[i] = left;
+        ctx.best.add(eval(ctx.stats, &ctx.qtys), &ctx.qtys);
     } else {
         for this in 0..(left+1) {
-            qtys[i] = this;
-            exh_recur(stats, qtys, i - 1, left - this, be);
+            ctx.qtys[i] = this;
+            exh_recur(ctx, i - 1, left - this);
         }
     }
 }
 
 pub fn exhaustive(stats: &[Stats], total: Qty) -> (Num, Vec<Qty>) {
     assert!(stats.len() >= 1);
-    let mut qtys = vec![!0; stats.len()];
-    let mut be = Best::new(best::Largest);
-    let last = qtys.len() - 1;
-    exh_recur(stats, &mut qtys, last, total, &mut be);
-    be.unwrap()
+    let mut ctx = ExhCtx {
+        stats: stats,
+        qtys: vec![!0; stats.len()],
+        best: Best::new(best::Largest),
+    };
+    exh_recur(&mut ctx, stats.len() - 1, total);
+    ctx.best.unwrap()
 }
 
-// Conjecture: this problem is amenable to hill-climbing.
+// Conjecture: this problem is amenable to hill-climbing.  ...without
+// the part 2 addendum, at least.  Probably still is even with it,
+// with a little more subtlety, since everything except the final
+// metric is linear.
 
 #[cfg(test)]
 mod tests {
