@@ -1,0 +1,17 @@
+[root]
+name = "day15"
+version = "0.1.0"
+dependencies = [
+ "combine 1.2.0 (registry+https://github.com/rust-lang/crates.io-index)",
+ "util 0.1.2",
+]
+
+[[package]]
+name = "combine"
+version = "1.2.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+
+[[package]]
+name = "util"
+version = "0.1.2"
+
