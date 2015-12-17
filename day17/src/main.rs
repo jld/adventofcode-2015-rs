@@ -4,7 +4,7 @@ mod pascal;
 
 use std::io::{stdin,BufRead};
 
-pub type Vol = u32;
+pub type Vol = u8;
 pub type Num = u64;
 
 fn main() {
