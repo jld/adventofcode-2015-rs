@@ -1,5 +1,6 @@
 mod exhaustive;
 mod witnessed;
+mod pascal;
 
 use std::io::{stdin,BufRead};
 
