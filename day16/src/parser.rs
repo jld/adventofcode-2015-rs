@@ -36,8 +36,8 @@ impl Parser {
 
 fn mkpred(p2: bool, k: &str, v: Count) -> Pred {
     match (p2, k) {
-        (true, "cats") | (true, "trees") => Box::new(move |uv| uv > v),
-        (true, "pomeranians") | (true, "goldfish") => Box::new(move |uv| uv < v),
+        (true, "cats") | (true, "trees") => Box::new(move |uv| uv < v),
+        (true, "pomeranians") | (true, "goldfish") => Box::new(move |uv| uv > v),
         _ => Box::new(move |uv| uv == v)
     }
 }
