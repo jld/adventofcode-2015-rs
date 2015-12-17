@@ -8,20 +8,31 @@ enum LazyIter<I, F> where F: FnOnce() -> BoxIter<I> {
     Future(Box<F>),
     Present,
     Past(BoxIter<I>),
+    Done,
 }
 impl<I, F> Iterator for LazyIter<I, F> where F: FnOnce() -> BoxIter<I> {
     type Item = I;
     fn next(&mut self) -> Option<I> {
-        if let LazyIter::Past(ref mut iter) = *self {
-            return iter.next();
+        let early = match *self {
+            LazyIter::Done => Some(None),
+            LazyIter::Past(ref mut iter) => Some(iter.next()),
+            _ => None
+        };
+        if let Some(rv) = early {
+            if rv.is_none() {
+                // Drop the inner iterator.  This is important if
+                // it's the first half of a `Chain`.
+                *self = LazyIter::Done;
+            }
+            return rv;
         }
         match mem::replace(self, LazyIter::Present) {
             LazyIter::Present => panic!("circular dependency in LazyIter"),
-            LazyIter::Past(_) => unreachable!(),
             LazyIter::Future(f) => {
                 *self = LazyIter::Past(f());
                 self.next()
-            }
+            },
+            _ => unreachable!()
         }
     }
 }
