@@ -1,6 +1,6 @@
 use ::{Vol, Num};
 
-fn exhaustive(ns: &[Vol], target: Vol) -> Num {
+pub fn exhaustive(ns: &[Vol], target: Vol) -> Num {
     if ns.is_empty() {
         if target == 0 { 1 } else { 0 }
     } else {
