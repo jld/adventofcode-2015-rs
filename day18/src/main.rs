@@ -12,16 +12,16 @@ type LineOut = mpsc::SyncSender<Box<Line>>;
 
 fn new_line(like: &Line) -> Box<Line> { vec![false; like.len()].into_boxed_slice() }
 
-fn prepend_life(line_out: LineOut, n: u64) -> LineOut {
+fn prepend_life(line_out: LineOut, n: u64, stuck: bool) -> LineOut {
     if n == 0 {
         return line_out;
     }
     let (new_out, line_in) = mpsc::sync_channel(BUFSIZE);
-    thread::spawn(move || life_stage(line_in, line_out, n - 1));
+    thread::spawn(move || life_stage(line_in, line_out, n - 1, stuck));
     new_out
 }
 
-fn life_line(top: &Line, mid: &Line, bot: &Line) -> Box<Line> {
+fn life_line(top: &Line, mid: &Line, bot: &Line, stuck: bool) -> Box<Line> {
     debug_assert_eq!(top.len(), mid.len());
     debug_assert_eq!(mid.len(), bot.len());
     let w = mid.len();
@@ -41,33 +41,41 @@ fn life_line(top: &Line, mid: &Line, bot: &Line) -> Box<Line> {
         if mid[i] { buf[i+1] += 2; }
         if bot[i] { buf[i+1] += 2; }
     }
-    buf.into_iter().map(|b| b >= 5 && b <= 7).collect::<Vec<_>>().into_boxed_slice()
+    let mut out: Vec<_> = buf.into_iter().map(|b| b >= 5 && b <= 7).collect();
+    if stuck {
+        out.first_mut().map_or((), |b| *b = true);
+        out.last_mut().map_or((), |b| *b = true);
+    }
+    out.into_boxed_slice()
 }
 
-fn life_stage(line_in: LineIn, line_out: LineOut, n: u64) {
+fn life_stage(line_in: LineIn, line_out: LineOut, n: u64, stuck: bool) {
+    let mut first = true;
     let mut bot = if let Ok(bot) = line_in.recv() { bot } else { return };
     let mut mid = new_line(&bot);
     let mut top;
     
-    let line_out = prepend_life(line_out, n);
+    let line_out = prepend_life(line_out, n, stuck);
 
     while let Ok(inc) = line_in.recv() {
         assert_eq!(inc.len(), bot.len());
         top = mid;
         mid = bot;
         bot = inc;
-        line_out.send(life_line(&top, &mid, &bot)).expect("broken pipe in life_stage");
+        line_out.send(life_line(&top, &mid, &bot, first && stuck))
+            .expect("broken pipe in life_stage");
+        first = false;
     }
     top = mid;
     mid = bot;
     bot = new_line(&mid);
-    line_out.send(life_line(&top, &mid, &bot)).expect("broken pipe in life_stage");
+    line_out.send(life_line(&top, &mid, &bot, stuck)).expect("broken pipe in life_stage");
 }
 
-fn run_life<I>(input: I, n: u64) -> mpsc::IntoIter<Box<Line>>
+fn run_life<I>(input: I, n: u64, stuck: bool) -> mpsc::IntoIter<Box<Line>>
     where I: IntoIterator<Item=Box<Line>> + Send + 'static {
     let (final_out, final_in) = mpsc::sync_channel(BUFSIZE);
-    let init_out = prepend_life(final_out, n);
+    let init_out = prepend_life(final_out, n, stuck);
     let cat = thread::spawn(move || {
         for line in input {
             init_out.send(line).expect("broken pipe in cat");
@@ -93,20 +101,25 @@ fn main() {
     let n: u64 = env::args()
         .nth(1).expect("give number of iterations as argument")
         .parse().unwrap();
+    let is_print = "print".starts_with(&env::args().nth(2).unwrap_or("count".to_owned()));
+
     let stdin = stdin();
-    // FIXME: just buffer this rather than trying to fight with the types on Stdin et al.
     let input: Vec<_> = stdin.lock().lines().map(|rl| {
         parse_line(&rl.expect("I/O error"))
     }).collect();
-    let output = run_life(input, n);
-    if "print".starts_with(&env::args().nth(2).unwrap_or("count".to_owned())) {
-        for line in output {
-            println!("{}", print_line(&line));
+    for &stuck in [false, true].iter() {
+        let label = if stuck { "Stuck" } else { "Unstuck" };
+        let output = run_life(input.clone(), n, stuck);
+        if is_print {
+            println!("{}:", label);
+            for line in output {
+                println!("{}", print_line(&line));
+            }
+        } else {
+            let popcnt: usize = output.flat_map(|line| line.into_vec().into_iter())
+                .fold(0, |a, b| if b { a + 1 } else { a });
+            println!("{}: {}", label, popcnt);
         }
-    } else {
-        let popcnt: usize = output.flat_map(|line| line.into_vec().into_iter())
-            .fold(0, |a, b| if b { a + 1 } else { a });
-        println!("{}", popcnt);
     }
 }
 
@@ -114,8 +127,9 @@ fn main() {
 mod tests {
     use super::{run_life,parse_line,print_line};
 
-    fn run(strs: &[&str], n: u64) -> Vec<String> {
-        run_life(own(strs).into_iter().map(|s| parse_line(&s)), n).map(|l| print_line(&l)).collect()
+    fn run(strs: &[&str], n: u64, stuck: bool) -> Vec<String> {
+        run_life(own(strs).into_iter().map(|s| parse_line(&s)), n, stuck)
+            .map(|l| print_line(&l)).collect()
     }
 
     fn own(strs: &[&str]) -> Vec<String> {
@@ -126,13 +140,13 @@ mod tests {
     fn blink() {
         assert_eq!(run(&["...",
                          "###",
-                         "..."], 1),
+                         "..."], 1, false),
                    own(&[".#.",
                          ".#.",
                          ".#."]));
         assert_eq!(run(&[".#.",
                          ".#.",
-                         ".#."], 1),
+                         ".#."], 1, false),
                    own(&["...",
                          "###",
                          "..."]));
@@ -142,13 +156,13 @@ mod tests {
     fn blink_more() {
         assert_eq!(run(&["...",
                          "###",
-                         "..."], 99),
+                         "..."], 99, false),
                    own(&[".#.",
                          ".#.",
                          ".#."]));
         assert_eq!(run(&[".#.",
                          ".#.",
-                         ".#."], 99),
+                         ".#."], 99, false),
                    own(&["...",
                          "###",
                          "..."]));
@@ -194,17 +208,69 @@ mod tests {
 
         for i in 0..STUFF.len() {
             for j in i..STUFF.len() {
-                assert_eq!(run(STUFF[i], (j - i) as u64), own(STUFF[j]))
+                assert_eq!(run(STUFF[i], (j - i) as u64, false), own(STUFF[j]))
             }
         }
     }
 
     #[test]
+    fn example_stuck() {
+        const STUFF: [&'static[&'static str]; 6] = [
+            &["##.#.#",
+              "...##.",
+              "#....#",
+              "..#...",
+              "#.#..#",
+              "####.#"],
+
+            &["#.##.#",
+              "####.#",
+              "...##.",
+              "......",
+              "#...#.",
+              "#.####"],
+
+            &["#..#.#",
+              "#....#",
+              ".#.##.",
+              "...##.",
+              ".#..##",
+              "##.###"],
+
+            &["#...##",
+              "####.#",
+              "..##.#",
+              "......",
+              "##....",
+              "####.#"],
+
+            &["#.####",
+              "#....#",
+              "...#..",
+              ".##...",
+              "#.....",
+              "#.#..#"],
+
+            &["##.###",
+              ".##..#",
+              ".##...",
+              ".##...",
+              "#.#...",
+              "##...#"]];
+
+        for i in 0..STUFF.len() {
+            for j in i..STUFF.len() {
+                assert_eq!(run(STUFF[i], (j - i) as u64, true), own(STUFF[j]))
+            }
+        }
+    }
+    
+    #[test]
     fn glide() {
         assert_eq!(run(&[".#..",
                          "..#.",
                          "###.",
-                         "...."], 4),
+                         "...."], 4, false),
 
                    own(&["....",
                          "..#.",
