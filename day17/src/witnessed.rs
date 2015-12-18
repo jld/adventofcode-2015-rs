@@ -4,15 +4,15 @@ use ::Vol;
 
 pub type BoxIter<I> = Box<Iterator<Item=I>>;
 
-enum LazyIter<I, F> where F: FnOnce() -> BoxIter<I> {
-    Future(Box<F>),
+enum LazyIter<I, F> where I: Iterator, F: FnOnce() -> I {
+    Future(F),
     Present,
-    Past(BoxIter<I>),
+    Past(I),
     Done,
 }
-impl<I, F> Iterator for LazyIter<I, F> where F: FnOnce() -> BoxIter<I> {
-    type Item = I;
-    fn next(&mut self) -> Option<I> {
+impl<I, F> Iterator for LazyIter<I, F> where I: Iterator, F: FnOnce() -> I {
+    type Item = I::Item;
+    fn next(&mut self) -> Option<Self::Item> {
         let early = match *self {
             LazyIter::Done => Some(None),
             LazyIter::Past(ref mut iter) => Some(iter.next()),
@@ -36,9 +36,9 @@ impl<I, F> Iterator for LazyIter<I, F> where F: FnOnce() -> BoxIter<I> {
         }
     }
 }
-impl<I, F> LazyIter<I, F> where F: FnOnce() -> BoxIter<I> {
+impl<I, F> LazyIter<I, F> where I: Iterator, F: FnOnce() -> I {
     fn new(f: F) -> LazyIter<I, F> {
-        LazyIter::Future(Box::new(f))
+        LazyIter::Future(f)
     }
 }
 
@@ -59,7 +59,7 @@ pub fn eggnog_iter(vols: &[Vol], target: Vol) -> BoxIter<Vec<Vol>> {
                     None => without,
                     Some(ntarg) => Box::new(without.chain(
                         eggnog_iter(&vols, ntarg)
-                            .map(move |mut nog| { nog.push(vol0); nog })))
+                            .map(move |mut nog| { nog.push(vol0); nog }))) as BoxIter<_>
                 }
             }))
         }
