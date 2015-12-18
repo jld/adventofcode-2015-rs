@@ -1,5 +1,7 @@
 const BUFSIZE: usize = 10;
 
+use std::env;
+use std::io::{stdin,BufRead};
 use std::mem::drop;
 use std::sync::mpsc;
 use std::thread;
@@ -10,7 +12,7 @@ type LineOut = mpsc::SyncSender<Box<Line>>;
 
 fn new_line(like: &Line) -> Box<Line> { vec![false; like.len()].into_boxed_slice() }
 
-fn prepend_life(line_out: LineOut, n: usize) -> LineOut {
+fn prepend_life(line_out: LineOut, n: u64) -> LineOut {
     if n == 0 {
         return line_out;
     }
@@ -42,7 +44,7 @@ fn life_line(top: &Line, mid: &Line, bot: &Line) -> Box<Line> {
     buf.into_iter().map(|b| b >= 5 && b <= 7).collect::<Vec<_>>().into_boxed_slice()
 }
 
-fn life_stage(line_in: LineIn, line_out: LineOut, n: usize) {
+fn life_stage(line_in: LineIn, line_out: LineOut, n: u64) {
     let mut bot = if let Ok(bot) = line_in.recv() { bot } else { return };
     let mut mid = new_line(&bot);
     let mut top;
@@ -62,8 +64,7 @@ fn life_stage(line_in: LineIn, line_out: LineOut, n: usize) {
     line_out.send(life_line(&top, &mid, &bot)).expect("broken pipe in life_stage");
 }
 
-
-fn run_life<I>(input: I, n: usize) -> mpsc::IntoIter<Box<Line>>
+fn run_life<I>(input: I, n: u64) -> mpsc::IntoIter<Box<Line>>
     where I: IntoIterator<Item=Box<Line>> + Send + 'static {
     let (final_out, final_in) = mpsc::sync_channel(BUFSIZE);
     let init_out = prepend_life(final_out, n);
@@ -89,14 +90,31 @@ fn print_line(l: &Line) -> String {
 }
 
 fn main() {
-    // stuff
+    let n: u64 = env::args()
+        .nth(1).expect("give number of iterations as argument")
+        .parse().unwrap();
+    let stdin = stdin();
+    // FIXME: just buffer this rather than trying to fight with the types on Stdin et al.
+    let input: Vec<_> = stdin.lock().lines().map(|rl| {
+        parse_line(&rl.expect("I/O error"))
+    }).collect();
+    let output = run_life(input, n);
+    if "print".starts_with(&env::args().nth(2).unwrap_or("count".to_owned())) {
+        for line in output {
+            println!("{}", print_line(&line));
+        }
+    } else {
+        let popcnt: usize = output.flat_map(|line| line.into_vec().into_iter())
+            .fold(0, |a, b| if b { a + 1 } else { a });
+        println!("{}", popcnt);
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{run_life,parse_line,print_line};
 
-    fn run(strs: &[&str], n: usize) -> Vec<String> {
+    fn run(strs: &[&str], n: u64) -> Vec<String> {
         run_life(own(strs).into_iter().map(|s| parse_line(&s)), n).map(|l| print_line(&l)).collect()
     }
 
@@ -176,8 +194,21 @@ mod tests {
 
         for i in 0..STUFF.len() {
             for j in i..STUFF.len() {
-                assert_eq!(run(STUFF[i], j - i), own(STUFF[j]))
+                assert_eq!(run(STUFF[i], (j - i) as u64), own(STUFF[j]))
             }
         }
+    }
+
+    #[test]
+    fn glide() {
+        assert_eq!(run(&[".#..",
+                         "..#.",
+                         "###.",
+                         "...."], 4),
+
+                   own(&["....",
+                         "..#.",
+                         "...#",
+                         ".###"]));
     }
 }
