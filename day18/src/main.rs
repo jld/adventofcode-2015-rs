@@ -3,6 +3,7 @@ const BUFSIZE: usize = 10;
 use std::env;
 use std::io::{stdin,BufRead};
 use std::mem::drop;
+use std::borrow::BorrowMut;
 use std::sync::mpsc;
 use std::thread;
 
@@ -19,6 +20,14 @@ fn prepend_life(line_out: LineOut, n: u64, stuck: bool) -> LineOut {
     let (new_out, line_in) = mpsc::sync_channel(BUFSIZE);
     thread::spawn(move || life_stage(line_in, line_out, n - 1, stuck));
     new_out
+}
+
+fn touch_ends<T, F>(sl: &mut [T], mut f: F) where F: FnMut(&mut T) {
+    sl.first_mut().map_or((), &mut f);
+    sl.last_mut().map_or((), &mut f);
+}
+fn touch_corners<T, B, F>(slsl: &mut [B], mut f: F) where F: FnMut(&mut T), B: BorrowMut<[T]> {
+    touch_ends(slsl, |sl| touch_ends(sl.borrow_mut(), &mut f))
 }
 
 fn life_line(top: &Line, mid: &Line, bot: &Line, stuck: bool) -> Box<Line> {
@@ -43,8 +52,7 @@ fn life_line(top: &Line, mid: &Line, bot: &Line, stuck: bool) -> Box<Line> {
     }
     let mut out: Vec<_> = buf.into_iter().map(|b| b >= 5 && b <= 7).collect();
     if stuck {
-        out.first_mut().map_or((), |b| *b = true);
-        out.last_mut().map_or((), |b| *b = true);
+        touch_ends(&mut out, |b| *b = true);
     }
     out.into_boxed_slice()
 }
@@ -104,11 +112,15 @@ fn main() {
     let is_print = "print".starts_with(&env::args().nth(2).unwrap_or("count".to_owned()));
 
     let stdin = stdin();
-    let input: Vec<_> = stdin.lock().lines().map(|rl| {
+    let ur_input: Vec<_> = stdin.lock().lines().map(|rl| {
         parse_line(&rl.expect("I/O error"))
     }).collect();
     for &stuck in [false, true].iter() {
         let label = if stuck { "Stuck" } else { "Unstuck" };
+        let mut input = ur_input.clone();
+        if stuck {
+            touch_corners(&mut input, |b| *b = true);
+        }
         let output = run_life(input.clone(), n, stuck);
         if is_print {
             println!("{}:", label);
