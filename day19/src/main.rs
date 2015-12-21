@@ -1,10 +1,10 @@
-extern crate aho_corasick;
+extern crate regex;
 extern crate util;
 mod cyk;
 
 use std::collections::HashSet;
 use std::io::{stdin,BufRead};
-use aho_corasick::{Automaton,AcAutomaton};
+use regex::Regex;
 use util::SymTab;
 use cyk::CYK;
 
@@ -20,13 +20,13 @@ impl Problem {
         self.rewrites.push((lhs.to_owned(), rhs.to_owned()));
     }
     fn add_lines<I: Iterator<Item=String>>(&mut self, lines: &mut I) {
+        let line_re = Regex::new(r"^((?:[A-Z][a-z]*)+|[a-z]+) => ((?:[A-Z][a-z]*)+)").unwrap();
         for line in lines {
             if line.is_empty() {
                 break;
             }
-            let arrow_b = line.find(" => ").expect("expected \" => \"");
-            let arrow_e = arrow_b + " => ".len();
-            self.add(&line[..arrow_b], &line[arrow_e..]);
+            let caps = line_re.captures(&line).expect("syntax error");
+            self.add(&caps[1], &caps[2]);
         }
     }
     fn from_lines<I: Iterator<Item=String>>(lines: &mut I) -> Self {
@@ -53,7 +53,7 @@ impl Problem {
                 let start = cursor + offset;
                 let end = start + rw.0.len();
                 cursor = start + 1;
-                
+
                 let mut after = String::new();
                 after.push_str(&before[..start]);
                 after.push_str(&rw.1);
@@ -78,38 +78,41 @@ impl Problem {
         Problem { rewrites: self.rewrites.iter().cloned().map(|(l,r)| (r,l)).collect() }
     }
     fn search_fast(&self, before: &str, after: &str) -> Option<usize> {
+        let atom_re = Regex::new(r"[A-Z][a-z]*").unwrap();
         let mut stab = SymTab::new();
-        for &(ref lhs, _) in &self.rewrites {
-            if lhs != before {
-                let _ = stab.read(lhs);
+        let mut starts =  Vec::new();
+        let mut parsed_rew = Vec::new();
+        let target;
+        {
+            let mut parse = |s: &str| {
+                let mut acc = Vec::new();
+                let mut expected = 0;
+                for (begin, end) in atom_re.find_iter(s)  {
+                    assert!(begin == expected);
+                    acc.push(stab.read(&s[begin..end]));
+                    expected = end;
+                }
+                acc
+            };
+            for &(ref lhs, ref rhs) in &self.rewrites {
+                let prhs = parse(rhs);
+                if lhs == before {
+                    assert!(prhs.len() == 1, "start symbol must have only unit productions");
+                    starts.push(prhs[0]);
+                } else {
+                    let plhs = parse(lhs);
+                    assert!(plhs.len() == 1, "context-free grammars only, please");
+                    assert!(prhs.len() >= 2, "BEES: {:?} => {:?}", lhs, rhs);
+                    parsed_rew.push((plhs[0], prhs));
+                }
             }
+            target = parse(after);
         }
         let stab = stab; // freeze
-        let syms = AcAutomaton::new(stab.pborrow());
-        let parse = |s: &str| {
-            let mut acc = Vec::new();
-            let mut expected = 0;
-            for found in syms.find(s) {
-                assert!(found.start == expected,
-                        "Unparseable thing: {:?}", &s[expected..found.start]);
-                acc.push(found.pati);
-                expected = found.end;
-            }
-            acc
-        };
         let mut cyk = CYK::new(stab.len());
-        let mut starts = Vec::new();
-        for &(ref lhs, ref rhs) in &self.rewrites {
-            let prhs = parse(rhs);
-            if lhs == before {
-                assert!(prhs.len() == 1, "start symbol must have only unit productions");
-                starts.push(prhs[0]);
-            } else {
-                let plhs = stab.try_read(lhs).unwrap();
-                cyk.add_rule(plhs, &prhs);
-            }
+        for (plhs, prhs) in parsed_rew {
+            cyk.add_rule(plhs, &prhs);
         }
-        let target = parse(after);
         cyk.solve(&starts, &target).map(|u| /* compensate for initial unit prod. */ u + 1)
     }
 }
