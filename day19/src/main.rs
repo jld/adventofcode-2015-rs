@@ -1,6 +1,7 @@
 extern crate regex;
 use regex::Regex;
 use std::collections::HashSet;
+use std::io::{stdin,BufRead};
 
 struct Problem {
     rewrites: Vec<(Regex, String)>,
@@ -43,7 +44,12 @@ impl Problem {
 }
 
 fn main() {
-    println!("Hello, world!");
+    let stdin = stdin();
+    let mut inline = stdin.lock().lines().map(|l| l.expect("I/O error"));
+    let prob = Problem::from_lines(&mut inline);
+    let input = inline.next().expect("expected calibration string after blank line");
+    let stuff = prob.rewrite(&input);
+    println!("{}", stuff.len());
 }
 
 #[cfg(test)]
