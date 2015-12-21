@@ -77,7 +77,7 @@ fn main() {
     let prob = Problem::from_lines(&mut inline);
     let input = inline.next().expect("expected target string after blank line");
     println!("Calibration: {}", prob.rewrite(&input).len());
-    println!("Path length: {}", prob.search("e", &input));
+    println!("Path length: {}", prob.invert().search(&input, "e"));
 }
 
 #[cfg(test)]
