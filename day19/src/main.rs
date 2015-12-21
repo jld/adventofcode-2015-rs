@@ -1,3 +1,5 @@
+mod cyk;
+
 use std::collections::HashSet;
 use std::io::{stdin,BufRead};
 
