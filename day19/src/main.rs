@@ -33,6 +33,13 @@ impl Problem {
         self.rewrite_into(before, &mut set);
         set
     }
+    fn rewrite_all(&self, befores: &HashSet<String>) -> HashSet<String> {
+        let mut set = HashSet::new();
+        for before in befores {
+            self.rewrite_into(before, &mut set);
+        }
+        set
+    }
     fn rewrite_into(&self, before: &str, set: &mut HashSet<String>) {
         for rw in self.rewrites.iter() {
             for (start, end) in rw.0.find_iter(before) {
@@ -44,6 +51,18 @@ impl Problem {
             }
         }
     }
+    fn search(&self, before: &str, after: &str) -> usize {
+        let mut stuff = HashSet::new();
+        stuff.insert(before.to_owned());
+        for len in 0.. {
+            if stuff.contains(after) {
+                return len;
+            }
+            let oldstuff = stuff;
+            stuff = self.rewrite_all(&oldstuff);
+        }
+        unreachable!()
+    }
 }
 
 fn main() {
@@ -51,8 +70,8 @@ fn main() {
     let mut inline = stdin.lock().lines().map(|l| l.expect("I/O error"));
     let prob = Problem::from_lines(&mut inline);
     let input = inline.next().expect("expected target string after blank line");
-    let stuff = prob.rewrite(&input);
-    println!("{}", stuff.len());
+    println!("Calibration: {}", prob.rewrite(&input).len());
+    println!("Path length: {}", prob.search("e", &input));
 }
 
 #[cfg(test)]
@@ -62,6 +81,13 @@ mod tests {
     fn get_example() -> Problem {
         let mut l = "H => HO\nH => OH\nO => HH".lines().map(|s| s.to_owned());
         Problem::from_lines(&mut l)
+    }
+
+    fn get_example2() -> Problem {
+        let mut p = get_example();
+        let mut l = "e => H\ne => O".lines().map(|s| s.to_owned());
+        p.add_lines(&mut l);
+        p
     }
 
     #[test]
@@ -82,5 +108,12 @@ mod tests {
         let stuff = p.rewrite("H2O");
         assert_eq!(stuff.len(), 1);
         assert!(stuff.contains("OO2O"));
+    }
+
+    #[test]
+    fn example_path() {
+        let p = get_example2();
+        assert_eq!(p.search("e", "HOH"), 3);
+        assert_eq!(p.search("e", "HOHOHO"), 6);
     }
 }
