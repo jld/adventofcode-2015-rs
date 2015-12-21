@@ -3,6 +3,7 @@ use std::cmp::{PartialOrd, Ord, Ordering};
 use std::env;
 
 type Num = usize;
+type Address = Num;
 type Payload = Num;
 
 #[derive(Debug, PartialEq, Eq)]
@@ -36,22 +37,27 @@ impl ElfParade {
     }
 }
 impl Iterator for ElfParade {
-    type Item = Vec<Payload>;
+    type Item = (Address, Payload);
     fn next(&mut self) -> Option<Self::Item> {
-        let mut acc = vec![];
-        self.pending.push(Elf::new(self.here));
-        while self.pending.peek().unwrap().house == self.here {
+        let mut loot = 0;
+        let here = self.here;
+        self.pending.push(Elf::new(here));
+        while self.pending.peek().unwrap().house == here {
             let elf = self.pending.pop().unwrap();
             self.pending.push(elf.next());
-            acc.push(elf.stride);
+            loot += elf.stride;
         }
         self.here += 1;
-        Some(acc)
+        Some((here, loot))
     }
 }
 
 fn main() {
-    println!("Hello, world!");
+    let input: Num = env::args().nth(1).expect("supply puzzle input as first argument")
+        .parse().unwrap();
+    let input = (input + 9) / 10; // http://tvtropes.org/pmwiki/pmwiki.php/Main/PinballScoring
+    let (addr, _loot) = ElfParade::new().find(|&(_addr, loot)| loot >= input).unwrap();
+    println!("{}", addr);
 }
 
 #[cfg(test)]
@@ -60,14 +66,14 @@ mod tests {
 
     #[test]
     fn example_nth() {
-        assert_eq!(ElfParade::new().nth(0).unwrap(), vec![1]);
-        assert_eq!(ElfParade::new().nth(3).unwrap(), vec![1, 2, 4]);
+        assert_eq!(ElfParade::new().nth(0).unwrap(), (1, 1));
+        assert_eq!(ElfParade::new().nth(3).unwrap(), (4, 7));
     }
 
     #[test]
     fn example_sums() {
-        let loot = ElfParade::new().map(|es| es.into_iter().fold(0, |a, b| a + b));
-        let loot: Vec<_> = loot.take(9).collect();
+        let (addrs, loot): (Vec<_>, Vec<_>) = ElfParade::new().take(9).unzip();
+        assert_eq!(addrs, vec![1, 2, 3, 4, 5, 6, 7, 8, 9]);
         assert_eq!(loot, vec![1, 3, 4, 7, 6, 12, 8, 15, 13]);
     }
 }
