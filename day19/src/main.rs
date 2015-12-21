@@ -1,7 +1,12 @@
+extern crate aho_corasick;
+extern crate util;
 mod cyk;
 
 use std::collections::HashSet;
 use std::io::{stdin,BufRead};
+use aho_corasick::{Automaton,AcAutomaton};
+use util::SymTab;
+use cyk::CYK;
 
 struct Problem {
     rewrites: Vec<(String, String)>,
@@ -72,6 +77,41 @@ impl Problem {
     fn invert(&self) -> Self {
         Problem { rewrites: self.rewrites.iter().cloned().map(|(l,r)| (r,l)).collect() }
     }
+    fn search_fast(&self, before: &str, after: &str) -> Option<usize> {
+        let mut stab = SymTab::new();
+        for &(ref lhs, _) in &self.rewrites {
+            if lhs != before {
+                let _ = stab.read(lhs);
+            }
+        }
+        let stab = stab; // freeze
+        let syms = AcAutomaton::new(stab.pborrow());
+        let parse = |s: &str| {
+            let mut acc = Vec::new();
+            let mut expected = 0;
+            for found in syms.find(s) {
+                assert!(found.start == expected,
+                        "Unparseable thing: {:?}", &s[expected..found.start]);
+                acc.push(found.pati);
+                expected = found.end;
+            }
+            acc
+        };
+        let mut cyk = CYK::new(stab.len());
+        let mut starts = Vec::new();
+        for &(ref lhs, ref rhs) in &self.rewrites {
+            let prhs = parse(rhs);
+            if lhs == before {
+                assert!(prhs.len() == 1, "start symbol must have only unit productions");
+                starts.push(prhs[0]);
+            } else {
+                let plhs = stab.try_read(lhs).unwrap();
+                cyk.add_rule(plhs, &prhs);
+            }
+        }
+        let target = parse(after);
+        cyk.solve(&starts, &target).map(|u| /* compensate for initial unit prod. */ u + 1)
+    }
 }
 
 fn main() {
@@ -80,7 +120,9 @@ fn main() {
     let prob = Problem::from_lines(&mut inline);
     let input = inline.next().expect("expected target string after blank line");
     println!("Calibration: {}", prob.rewrite(&input).len());
-    // println!("Path length: {}", prob.invert().search(&input, "e"));
+    println!("Path length (fast): {:?}", prob.search_fast("e", &input));
+    println!("Path length (fwd): {}", prob.search("e", &input));
+    println!("Path length (inv): {}", prob.search(&input, "e"));
 }
 
 #[cfg(test)]
@@ -139,5 +181,13 @@ mod tests {
         let p = get_example2().invert();
         assert_eq!(p.search("HOH", "e"), 3);
         assert_eq!(p.search("HOHOHO", "e"), 6);
+    }
+
+    #[test]
+    fn path_fast() {
+        let p = get_example2();
+        assert_eq!(p.search_fast("e", "HOH"), Some(3));
+        assert_eq!(p.search_fast("e", "HOHOHO"), Some(6));
+        assert_eq!(p.search_fast("e", "OOO"), None);
     }
 }

@@ -12,6 +12,9 @@ impl SymTab {
         rname: HashMap::new(),
         pname: Vec::new(),
     }}
+    pub fn try_read(&self, s: &str) -> Option<Id> {
+        self.rname.get(s).map(|&id| id)
+    }
     pub fn read(&mut self, s: &str) -> Id {
         // This clones the string unnecessarily if it's already
         // present.  Using `contains_key` and `insert` unecessarily
@@ -26,6 +29,9 @@ impl SymTab {
     }
     pub fn print(&self, n: Id) -> String {
         self.pname[n].clone()
+    }
+    pub fn pborrow(&self) -> &[String] {
+        &self.pname
     }
     pub fn len(&self) -> usize {
         self.pname.len()
