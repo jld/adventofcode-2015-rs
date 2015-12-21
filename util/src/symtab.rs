@@ -61,4 +61,26 @@ mod tests {
         assert_eq!(st.print(c0), "Word");
         assert_eq!(st.print(n0), "Law");
     }
+
+    #[test]
+    fn check_len() {
+        let mut st = SymTab::new();
+        assert_eq!(st.len(), 0);
+        let _ = st.read("Word");
+        assert_eq!(st.len(), 1);
+        let _ = st.read("Law");
+        assert_eq!(st.len(), 2);
+        let _ = st.read("Law");
+        assert_eq!(st.len(), 2);
+        let _ = st.read("Word");
+        assert_eq!(st.len(), 2);
+    }
+
+    #[test]
+    fn v013_stuff() {
+        let mut st = SymTab::new();
+        let _ = st.read("Word");
+        let _ = st.read("Law");
+        assert_eq!(st.pborrow(), &vec!["Word".to_owned(), "Law".to_owned()] as &[String]);
+    }
 }
