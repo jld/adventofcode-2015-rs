@@ -2,5 +2,3 @@
 name = "day19"
 version = "0.1.0"
 authors = ["Jed Davis <jld@panix.com>"]
-[dependencies]
-regex = "0.1.43"

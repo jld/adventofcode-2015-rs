@@ -5,6 +5,7 @@ struct Problem {
     rewrites: Vec<(String, String)>,
 }
 impl Problem {
+    #![allow(dead_code)]
     fn new() -> Self {
         Problem { rewrites: vec![] }
     }
@@ -77,7 +78,7 @@ fn main() {
     let prob = Problem::from_lines(&mut inline);
     let input = inline.next().expect("expected target string after blank line");
     println!("Calibration: {}", prob.rewrite(&input).len());
-    println!("Path length: {}", prob.invert().search(&input, "e"));
+    // println!("Path length: {}", prob.invert().search(&input, "e"));
 }
 
 #[cfg(test)]
