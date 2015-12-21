@@ -78,9 +78,9 @@ impl Problem {
         Problem { rewrites: self.rewrites.iter().cloned().map(|(l,r)| (r,l)).collect() }
     }
     fn search_fast(&self, before: &str, after: &str) -> Option<usize> {
-        let atom_re = Regex::new(r"[A-Z][a-z]*").unwrap();
+        let atom_re = Regex::new(r"[A-Za-z][a-z]*").unwrap();
         let mut stab = SymTab::new();
-        let mut starts =  Vec::new();
+        let mut starts = Vec::new();
         let mut parsed_rew = Vec::new();
         let target;
         {
@@ -96,24 +96,33 @@ impl Problem {
             };
             for &(ref lhs, ref rhs) in &self.rewrites {
                 let prhs = parse(rhs);
-                if lhs == before {
-                    assert!(prhs.len() == 1, "start symbol must have only unit productions");
-                    starts.push(prhs[0]);
-                } else {
-                    let plhs = parse(lhs);
-                    assert!(plhs.len() == 1, "context-free grammars only, please");
-                    assert!(prhs.len() >= 2, "BEES: {:?} => {:?}", lhs, rhs);
-                    parsed_rew.push((plhs[0], prhs));
+                match prhs.len() {
+                    0 => panic!("epsilon production for {:?} forbidden", lhs),
+                    1 => {
+                        assert!(lhs == before, "non-start unit production unimplemented");
+                        starts.push(prhs[0]);
+                    },
+                    _ => {
+                        let plhs = parse(lhs);
+                        assert!(plhs.len() == 1, "context-free grammars only, please");
+                        parsed_rew.push((plhs[0], prhs));
+                    }
                 }
             }
             target = parse(after);
         }
+        let adjust = if starts.is_empty() {
+            starts.push(stab.read(before));
+            0
+        } else {
+            1
+        };
         let stab = stab; // freeze
         let mut cyk = CYK::new(stab.len());
         for (plhs, prhs) in parsed_rew {
             cyk.add_rule(plhs, &prhs);
         }
-        cyk.solve(&starts, &target).map(|u| /* compensate for initial unit prod. */ u + 1)
+        cyk.solve(&starts, &target).map(|u| u + adjust)
     }
 }
 
@@ -124,8 +133,8 @@ fn main() {
     let input = inline.next().expect("expected target string after blank line");
     println!("Calibration: {}", prob.rewrite(&input).len());
     println!("Path length (fast): {:?}", prob.search_fast("e", &input));
-    println!("Path length (fwd): {}", prob.search("e", &input));
-    println!("Path length (inv): {}", prob.search(&input, "e"));
+    // println!("Path length (fwd): {}", prob.search("e", &input));
+    // println!("Path length (inv): {}", prob.search(&input, "e"));
 }
 
 #[cfg(test)]
