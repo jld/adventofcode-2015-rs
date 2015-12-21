@@ -1,26 +1,24 @@
-extern crate regex;
-use regex::Regex;
 use std::collections::HashSet;
 use std::io::{stdin,BufRead};
 
 struct Problem {
-    rewrites: Vec<(Regex, String)>,
+    rewrites: Vec<(String, String)>,
 }
 impl Problem {
     fn new() -> Self {
         Problem { rewrites: vec![] }
     }
     fn add(&mut self, lhs: &str, rhs: &str) {
-        self.rewrites.push((Regex::new(lhs).expect("bad pattern"), rhs.to_owned()));
+        self.rewrites.push((lhs.to_owned(), rhs.to_owned()));
     }
     fn add_lines<I: Iterator<Item=String>>(&mut self, lines: &mut I) {
-        let arrow = Regex::new(r"^(\pL+) => (\pL+)$").unwrap();
         for line in lines {
             if line.is_empty() {
                 break;
             }
-            let caps = arrow.captures(&line).expect("syntax error");
-            self.add(&caps[1], &caps[2]);
+            let arrow_b = line.find(" => ").expect("expected \" => \"");
+            let arrow_e = arrow_b + " => ".len();
+            self.add(&line[..arrow_b], &line[arrow_e..]);
         }
     }
     fn from_lines<I: Iterator<Item=String>>(lines: &mut I) -> Self {
@@ -42,9 +40,14 @@ impl Problem {
     }
     fn rewrite_into(&self, before: &str, set: &mut HashSet<String>) {
         for rw in self.rewrites.iter() {
-            for (start, end) in rw.0.find_iter(before) {
+            let mut cursor = 0;
+            while let Some(offset) = before[cursor..].find(&rw.0) {
+                let start = cursor + offset;
+                let end = start + rw.0.len();
+                cursor = start + 1;
+                
                 let mut after = String::new();
-                after.push_str(&before[0..start]);
+                after.push_str(&before[..start]);
                 after.push_str(&rw.1);
                 after.push_str(&before[end..]);
                 set.insert(after);
@@ -62,6 +65,9 @@ impl Problem {
             stuff = self.rewrite_all(&oldstuff);
         }
         unreachable!()
+    }
+    fn invert(&self) -> Self {
+        Problem { rewrites: self.rewrites.iter().cloned().map(|(l,r)| (r,l)).collect() }
     }
 }
 
@@ -115,5 +121,20 @@ mod tests {
         let p = get_example2();
         assert_eq!(p.search("e", "HOH"), 3);
         assert_eq!(p.search("e", "HOHOHO"), 6);
+    }
+
+    #[test]
+    fn example_inv() {
+        let p = get_example().invert();
+        for s in &["HOOH", "HOHO", "OHOH", "HHHH"] {
+            assert!(p.rewrite(s).contains("HOH"));
+        }
+    }
+
+    #[test]
+    fn path_inv() {
+        let p = get_example2().invert();
+        assert_eq!(p.search("HOH", "e"), 3);
+        assert_eq!(p.search("HOHOHO", "e"), 6);
     }
 }
