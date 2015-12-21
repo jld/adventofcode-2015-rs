@@ -30,6 +30,10 @@ impl Problem {
     }
     fn rewrite(&self, before: &str) -> HashSet<String> {
         let mut set = HashSet::new();
+        self.rewrite_into(before, &mut set);
+        set
+    }
+    fn rewrite_into(&self, before: &str, set: &mut HashSet<String>) {
         for rw in self.rewrites.iter() {
             for (start, end) in rw.0.find_iter(before) {
                 let mut after = String::new();
@@ -39,7 +43,6 @@ impl Problem {
                 set.insert(after);
             }
         }
-        set
     }
 }
 
@@ -47,7 +50,7 @@ fn main() {
     let stdin = stdin();
     let mut inline = stdin.lock().lines().map(|l| l.expect("I/O error"));
     let prob = Problem::from_lines(&mut inline);
-    let input = inline.next().expect("expected calibration string after blank line");
+    let input = inline.next().expect("expected target string after blank line");
     let stuff = prob.rewrite(&input);
     println!("{}", stuff.len());
 }
