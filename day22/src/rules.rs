@@ -106,6 +106,7 @@ impl Damage {
         match self {
             Damage::Magic(dmg) => dmg,
             Damage::Physical(dmg) =>
+                // 0 damage isn't a thing in the official rules, but might as well handle it.
                 dmg.checked_sub(1).map_or(0, |dmg_m1| dmg_m1.saturating_sub(armor) + 1)
         }
     }
@@ -233,5 +234,19 @@ impl State {
             .chain(|nself| nself.cast(sp))
             .chain(|nself| nself.upkeep())
             .chain(|nself| nself.boss_turn(w))
+    }
+}
+
+
+#[cfg(test)]
+mod tests {
+    use super::Damage;
+
+    #[test]
+    fn armor() {
+        assert_eq!(Damage::Physical(8).apply(3), 5);
+        assert_eq!(Damage::Physical(8).apply(300), 1);
+        assert_eq!(Damage::Physical(8).apply(0), 8);
+        assert_eq!(Damage::Magic(8).apply(3), 8);
     }
 }
