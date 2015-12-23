@@ -64,8 +64,7 @@ fn halve(n: Nat) -> Nat {
     n / 2
 }
 
-pub fn run(prog: &[Insn], init: &RegFile) -> RegFile {
-    let mut regs = init.clone();
+pub fn run(prog: &[Insn], mut regs: RegFile) -> RegFile {
     let mut pc: isize = 0;
     assert!(prog.len() < isize::MAX as usize); // Trivially true, but still.
     while pc >= 0 && pc < prog.len() as isize {
@@ -93,7 +92,7 @@ mod tests {
         assert_eq!(run(&[Insn::Inc(Reg::A),
                          Insn::Jio(Reg::A, 2),
                          Insn::Tpl(Reg::A),
-                         Insn::Inc(Reg::A)], &[].into()),
+                         Insn::Inc(Reg::A)], [].into()),
                    [(Reg::A, 2)].into());
     }
     
@@ -102,13 +101,13 @@ mod tests {
         assert_eq!(run(&[Insn::Inc(Reg::A),
                          Insn::Jie(Reg::A, 2),
                          Insn::Tpl(Reg::A),
-                         Insn::Inc(Reg::A)], &[].into()),
+                         Insn::Inc(Reg::A)], [].into()),
                    [(Reg::A, 4)].into());
         assert_eq!(run(&[Insn::Inc(Reg::A),
                          Insn::Tpl(Reg::A),
                          Insn::Jio(Reg::A, 2),
                          Insn::Tpl(Reg::A),
-                         Insn::Inc(Reg::A)], &[].into()),
+                         Insn::Inc(Reg::A)], [].into()),
                    [(Reg::A, 10)].into());
     }
 
@@ -124,9 +123,8 @@ mod tests {
                          Insn::Jmp(-5),
                          Insn::Hlf(Reg::A),
                          Insn::Jmp(-2)],
-                       &[(Reg::A, start)].into()),
+                       [(Reg::A, start)].into()),
                    [(Reg::A, 1),
                     (Reg::B, steps)].into());
     }
 }
-                   
