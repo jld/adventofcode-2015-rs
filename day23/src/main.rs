@@ -1,5 +1,5 @@
 extern crate regex;
-//mod parser;
+mod parser;
 mod interp;
 
 fn main() {
