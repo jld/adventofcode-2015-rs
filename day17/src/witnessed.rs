@@ -1,8 +1,8 @@
 use util::SubsetSumIter;
 use ::Vol;
 
-pub fn eggnog_iter(vols: &[Vol], target: Vol) -> SubsetSumIter<Vol> {
-    SubsetSumIter::new(vols, target)
+pub fn eggnog_iter(vols: &[Vol], target: Vol) -> Box<Iterator<Item=Vec<Vol>>> {
+    Box::new(SubsetSumIter::new(vols, target).map(|(used, _unused)| used))
 }
 
 #[cfg(test)]
