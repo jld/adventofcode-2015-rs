@@ -1,46 +1,9 @@
 use std::iter;
-use std::mem;
+use util::LazyIter;
 use ::Vol;
 
 pub type BoxIter<I> = Box<Iterator<Item=I>>;
 
-enum LazyIter<I, F> where I: Iterator, F: FnOnce() -> I {
-    Future(F),
-    Present,
-    Past(I),
-    Done,
-}
-impl<I, F> Iterator for LazyIter<I, F> where I: Iterator, F: FnOnce() -> I {
-    type Item = I::Item;
-    fn next(&mut self) -> Option<Self::Item> {
-        let early = match *self {
-            LazyIter::Done => Some(None),
-            LazyIter::Past(ref mut iter) => Some(iter.next()),
-            _ => None
-        };
-        if let Some(rv) = early {
-            if rv.is_none() {
-                // Drop the inner iterator.  This is important if
-                // it's the first half of a `Chain`.
-                *self = LazyIter::Done;
-            }
-            return rv;
-        }
-        match mem::replace(self, LazyIter::Present) {
-            LazyIter::Present => panic!("circular dependency in LazyIter"),
-            LazyIter::Future(f) => {
-                *self = LazyIter::Past(f());
-                self.next()
-            },
-            _ => unreachable!()
-        }
-    }
-}
-impl<I, F> LazyIter<I, F> where I: Iterator, F: FnOnce() -> I {
-    fn new(f: F) -> LazyIter<I, F> {
-        LazyIter::Future(f)
-    }
-}
 
 pub fn eggnog_iter(vols: &[Vol], target: Vol) -> BoxIter<Vec<Vol>> {
     match vols.split_last() {

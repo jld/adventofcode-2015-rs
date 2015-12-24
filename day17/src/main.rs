@@ -1,3 +1,4 @@
+extern crate util;
 mod exhaustive;
 mod witnessed;
 mod pascal;
@@ -5,7 +6,7 @@ mod pascal;
 use std::io::{stdin,BufRead};
 use std::env;
 
-pub type Vol = u8;
+pub type Vol = u16;
 pub type Num = u64;
 
 fn main() {

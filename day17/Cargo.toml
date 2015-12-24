@@ -2,3 +2,5 @@
 name = "day17"
 version = "0.1.0"
 authors = ["Jed Davis <jld@panix.com>"]
+[dependencies]
+util = { version = "0.1.4", path = "../util" }
