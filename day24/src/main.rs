@@ -43,9 +43,11 @@ enum Fail {
 
 // All that matters for the non-front groups is that there exist *some* equal split.
 fn whatever(stuff: Bag, groups: usize, each: Weight) -> Option<Vec<Bag>> {
-    if groups == 0 {
-        return Some(vec![]);
-    }
+    match groups {
+        0 => return Some(vec![]),
+        1 => return Some(vec![stuff]),
+        _ => ()
+    };
     let mut split = SubsetSumIter::new(&stuff, each);
     split.next().and_then(|(mine, theirs)| {
         whatever(theirs, groups - 1, each).map(|mut rest| {
