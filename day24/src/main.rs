@@ -1,6 +1,7 @@
 extern crate util;
 use std::cell::Cell;
-use std::cmp::{Ord,min};
+use std::cmp::Ord;
+use std::io::{stdin,BufRead};
 use util::SubsetSumIter;
 
 type Weight = u16;
@@ -65,7 +66,20 @@ fn compute(mut stuff: Vec<Weight>) -> Result<Plan, Fail> {
 }
 
 fn main() {
-    println!("Hello, world!");
+    let stdin = stdin();
+    let stuff: Bag =
+        stdin.lock().lines().map(|l| l.expect("I/O error").parse().expect("NaN")).collect();
+    match compute(stuff) {
+        Err(Fail::NonDiv3) => println!("Total weight not divisible by 3!"),
+        Err(Fail::Unsat) => println!("Packages can't be divided evenly!"),
+        Ok(plan) => {
+            println!("Front: {:?}", plan.front());
+            println!(" Left: {:?}", plan. left());
+            println!("Right: {:?}", plan.right());
+            println!("-- ");
+            println!("Quantum Entanglement: {}", plan.ent);
+        }
+    }
 }
 
 #[cfg(test)]
