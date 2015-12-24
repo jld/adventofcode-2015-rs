@@ -143,5 +143,32 @@ mod tests {
         // The problem-setter's combination enumerator seems to go
         // left-to-right and with-then-without; mine is right-to-left
         // and without-then-with, so it doesn't match.
+        for bag in plan.back {
+            assert_eq!(bag.iter().fold(0, |a, &b| a + b), 20)
+        }
+    }
+
+    #[test]
+    fn oddsize() {
+        assert_eq!(compute(vec![1, 1, 2], 2), Ok(Plan {
+            ent: 2,
+            front: vec![2],
+            back: vec![vec![1, 1]],
+        }));
+        assert_eq!(compute(vec![1, 1, 1, 1, 1, 1, 2], 4), Ok(Plan {
+            ent: 2,
+            front: vec![2],
+            back: vec![vec![1, 1], vec![1, 1], vec![1, 1]],
+        }));
+    }
+
+    #[test]
+    fn example2() {
+        let plan = compute(vec![1, 2, 3, 4, 5, 7, 8, 9, 10, 11], 4).unwrap();
+        assert_eq!(plan.ent, 44);
+        assert_eq!(plan.front, &[11, 4]);
+        for bag in plan.back {
+            assert_eq!(bag.iter().fold(0, |a, &b| a + b), 15)
+        }
     }
 }
