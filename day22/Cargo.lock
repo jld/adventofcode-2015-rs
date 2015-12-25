@@ -2,10 +2,10 @@
 name = "day22"
 version = "0.1.0"
 dependencies = [
- "util 0.1.5",
+ "util 0.1.6",
 ]
 
 [[package]]
 name = "util"
-version = "0.1.5"
+version = "0.1.6"
 
