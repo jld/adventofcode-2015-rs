@@ -1,4 +1,3 @@
-
 pub use self::Spell::*;
 pub use self::Result::*;
 
@@ -53,11 +52,16 @@ const RE_LEN: u8 = 5;
 const RE_POW: u16 = 101;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Win {
+    pub spent: u32
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Result {
     Ok(State),
-    // This isn't a `result::Result` mainly because `Err(Won)` looks silly.
+    // This isn't a `result::Result` mainly because `Err(Won(...))` looks silly.
     // (Also, treating `Won` and `Lost` the same way is usually not called for.)
-    Won,
+    Won(Win),
     // Could distinguish between HP<=0 and invalid spell if needed.
     Lost,
 }
@@ -65,8 +69,49 @@ impl Result {
     pub fn chain<F>(self, f: F) -> Result where F: FnOnce(State) -> Result {
         match self {
             Ok(state) => f(state),
-            Won => Won,
+            Won(w) => Won(w),
             Lost => Lost,
+        }
+    }
+    #[allow(dead_code)]
+    pub fn unwrap(self) -> State {
+        let verb = match self {
+            Ok(state) => return state,
+            Won(_) => "won",
+            Lost => "lost",
+        };
+        panic!("The player {}, but we expected the game to continue!", verb);
+    }
+    #[allow(dead_code)]
+    pub fn unwrap_win(self) -> Win {
+        let verb = match self {
+            Won(w) => return w,
+            Lost => "lost",
+            Ok(_) => "is still fighting",
+        };
+        panic!("The player {}, but we expected a win!", verb);
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum Damage {
+    Physical(u16),
+    Magic(u16),
+}
+impl Damage {
+    fn apply(self, armor: u16) -> u16 {
+        match self {
+            Damage::Magic(dmg) => dmg,
+            Damage::Physical(dmg) =>
+                // 0 damage isn't a thing in the official rules, but might as well handle it.
+                dmg.checked_sub(1).map_or(0, |dmg_m1| dmg_m1.saturating_sub(armor) + 1)
+        }
+    }
+    #[allow(dead_code)]
+    fn is_magic(self) -> bool {
+        match self {
+            Damage::Magic(_) => true,
+            Damage::Physical(_) => false,
         }
     }
 }
@@ -96,29 +141,6 @@ const TIDX_SH: usize = 0;
 const TIDX_PO: usize = 1;
 const TIDX_RE: usize = 2;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum Damage {
-    Physical(u16),
-    Magic(u16),
-}
-impl Damage {
-    fn apply(self, armor: u16) -> u16 {
-        match self {
-            Damage::Magic(dmg) => dmg,
-            Damage::Physical(dmg) =>
-                // 0 damage isn't a thing in the official rules, but might as well handle it.
-                dmg.checked_sub(1).map_or(0, |dmg_m1| dmg_m1.saturating_sub(armor) + 1)
-        }
-    }
-    #[allow(dead_code)]
-    fn is_magic(self) -> bool {
-        match self {
-            Damage::Magic(_) => true,
-            Damage::Physical(_) => false,
-        }
-    }
-}
-
 impl State {
     // FIXME: use a macro for the boilerplate accessors?
     // Also they'll probably need `#[allow(dead_code)]`.
@@ -132,13 +154,13 @@ impl State {
     pub fn poison_timer(&self) -> u8 { self.timers[TIDX_PO] }
     pub fn recharge_timer(&self) -> u8 { self.timers[TIDX_RE] }
 
-    pub fn new(player_hp: u16, boss_hp: u16) -> State {
+    pub fn new(player_hp: u16, player_mana: u16, boss_hp: u16) -> State {
         // Yes, I could store the HPs biased by -1, but also... I could not.
         assert!(player_hp != 0);
         assert!(boss_hp != 0);
         State {
             spent: 0,
-            mana: 0,
+            mana: player_mana,
             player_hp: player_hp,
             boss_hp: boss_hp,
             timers: [0, 0, 0],
@@ -154,7 +176,7 @@ impl State {
     fn inflict(self, dmg: Damage) -> Result {
         assert!(dmg.is_magic());
         match self.boss_hp.checked_sub(dmg.apply(self.boss_armor())) {
-            None | Some(0) => Won,
+            None | Some(0) => Won(Win { spent: self.spent }),
             Some(boss_hp) => Ok(State {
                 boss_hp: boss_hp,
                 ..self
@@ -223,11 +245,12 @@ impl State {
             .chain(|nself| nself.effect(TIDX_PO, |nself| nself.inflict(PO_DMG)))
             .chain(|nself| nself.effect(TIDX_RE, |nself| nself.recharge(RE_POW)))
     }
-    
+
     fn boss_turn(self, w: &World) -> Result {
         self.suffer(w.boss_damage)
     }
 
+    // TODO: some kind of event/visitor thing to enable the text UI shown. Because why not.
     pub fn round(self, w: &World, sp: Spell) -> Result {
         Ok(self)
             .chain(|nself| nself.upkeep())
@@ -240,7 +263,8 @@ impl State {
 
 #[cfg(test)]
 mod tests {
-    use super::Damage;
+    use super::{Damage,Spell,State,World,Result,Win};
+    use super::{MagicMissile,Drain,Shield,Poison,Recharge};
 
     #[test]
     fn armor() {
@@ -248,5 +272,63 @@ mod tests {
         assert_eq!(Damage::Physical(8).apply(300), 1);
         assert_eq!(Damage::Physical(8).apply(0), 8);
         assert_eq!(Damage::Magic(8).apply(3), 8);
+    }
+
+    macro_rules! check {
+        ($state:expr, { $($meth:ident: $val:expr),* }) => {
+            $(assert_eq!($state.$meth(), $val);)*
+        }
+    }
+
+    #[test]
+    fn example1() {
+        let start = State::new(10, 250, 13);
+        let world = World::new(8);
+        let after1 = start.round(&world, Poison).unwrap();
+        let exp_spent = Poison.cost() as u32;
+        check!(after1, { player_hp: 2, player_armor: 0, mana: 77,
+                         boss_hp: 10, poison_timer: 5,
+                         spent: exp_spent });
+        let exp_spent = exp_spent + MagicMissile.cost() as u32;
+        assert_eq!(after1.clone().round(&world, MagicMissile),
+                   Result::Won(Win { spent: exp_spent }));
+        // in more detail:
+        let a1x = after1.upkeep().unwrap();
+        check!(a1x, { player_hp: 2, player_armor: 0, mana: 77,
+                      boss_hp: 7, poison_timer: 4,
+                      spent: Poison.cost() as u32 });
+        let a1y = a1x.cast(MagicMissile).unwrap();
+        check!(a1y, { player_hp: 2, player_armor: 0, mana: 24,
+                      boss_hp: 3, poison_timer: 4,
+                      spent: exp_spent });
+        assert_eq!(a1y.upkeep(), Result::Won(Win { spent: exp_spent }));
+    }
+
+    #[test]
+    fn example2() {
+        let exp_spent = [Recharge, Shield, Drain, Poison, MagicMissile].iter()
+            .map(|sp| sp.cost() as u32)
+            .fold(0, |a, b| a + b);
+
+        let start = State::new(10, 250, 14);
+        let world = World::new(8);
+        let after1 = start.round(&world, Recharge).unwrap();
+
+        check!(after1, { player_hp: 2, player_armor: 0, mana: 122,
+                         boss_hp: 14, recharge_timer: 4 });
+        let after2 = after1.round(&world, Shield).unwrap();
+
+        check!(after2, { player_hp: 1, player_armor: 7, mana: 211,
+                         boss_hp: 14, recharge_timer: 2, shield_timer: 5 });
+        let after3 = after2.round(&world, Drain).unwrap();
+
+        check!(after3, { player_hp: 2, player_armor: 7, mana: 340,
+                         boss_hp: 12, recharge_timer: 0, shield_timer: 3 });
+        let after4 = after3.round(&world, Poison).unwrap();
+
+        check!(after4, { player_hp: 1, player_armor: 7, mana: 167,
+                         boss_hp: 9, shield_timer: 1, poison_timer: 5 });
+
+        assert_eq!(after4.round(&world, MagicMissile).unwrap_win().spent, exp_spent);
     }
 }
