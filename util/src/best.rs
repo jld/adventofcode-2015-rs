@@ -23,6 +23,7 @@ pub struct Best<S: Score, T, C: Cmp<S>> {
     cmp: C,
 }
 impl<S: Score, T, C: Cmp<S>> Best<S, T, C> {
+    // FIXME: have a () version of this when C doesn't need inferred (& is Default or w/e)
     pub fn new(cmp: C) -> Self {
         Best { best: None, cmp: cmp }
     }

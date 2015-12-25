@@ -29,8 +29,8 @@ impl Iterator for AllSpells {
     }
 }
 impl Spell {
-    fn all() -> AllSpells { AllSpells { ctr: 0 } }
-    fn cost(self) -> u16 {
+    pub fn all() -> AllSpells { AllSpells { ctr: 0 } }
+    pub fn cost(self) -> u16 {
         match self {
             MagicMissile => 53,
             Drain => 73,
@@ -121,7 +121,7 @@ pub struct World {
     boss_damage: Damage
 }
 impl World {
-    fn new(boss_damage: u16) -> World {
+    pub fn new(boss_damage: u16) -> World {
         World { boss_damage: Damage::Physical(boss_damage) }
     }
 }
