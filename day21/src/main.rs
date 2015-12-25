@@ -4,7 +4,7 @@ use std::env;
 use std::iter;
 use std::iter::FromIterator;
 use std::ops::Deref;
-use util::best::{Best,Smallest};
+use util::best;
 
 type Gold = u16;
 type HP = u16;
@@ -145,33 +145,32 @@ impl Damage {
 
 
 static WEAPONS: [Item<Weapon>; 5] = [
-    Item { name: "Dagger",     cost: 8,  effect: Weapon { dmg: 4 } },
+    Item { name: "Dagger",     cost:  8, effect: Weapon { dmg: 4 } },
     Item { name: "Shortsword", cost: 10, effect: Weapon { dmg: 5 } },
     Item { name: "Warhammer",  cost: 25, effect: Weapon { dmg: 6 } },
-    Item { name: "Longsword",   cost: 40, effect: Weapon { dmg: 7 } },
+    Item { name: "Longsword",  cost: 40, effect: Weapon { dmg: 7 } },
     Item { name: "Greataxe",   cost: 75, effect: Weapon { dmg: 8 } }];
 
 static ARMOR: [Item<Armor>; 5] = [
-    Item { name: "Leather",    cost: 13,  effect: Armor { ac: 1 } },
-    Item { name: "Chainmail",  cost: 31,  effect: Armor { ac: 2 } },
-    Item { name: "Splintmail", cost: 53,  effect: Armor { ac: 3 } },
-    Item { name: "Bandedmail", cost: 75,  effect: Armor { ac: 4 } },
+    Item { name: "Leather",    cost:  13, effect: Armor { ac: 1 } },
+    Item { name: "Chainmail",  cost:  31, effect: Armor { ac: 2 } },
+    Item { name: "Splintmail", cost:  53, effect: Armor { ac: 3 } },
+    Item { name: "Bandedmail", cost:  75, effect: Armor { ac: 4 } },
     Item { name: "Platemail",  cost: 102, effect: Armor { ac: 5 } }];
 
 static RINGS: [Item<Ring>; 6] = [
-    Item { name: "Damage +1",  cost: 25,  effect: Ring::PlusDmg(1) },
-    Item { name: "Damage +2",  cost: 50,  effect: Ring::PlusDmg(2) },
+    Item { name: "Damage +1",  cost:  25, effect: Ring::PlusDmg(1) },
+    Item { name: "Damage +2",  cost:  50, effect: Ring::PlusDmg(2) },
     Item { name: "Damage +3",  cost: 100, effect: Ring::PlusDmg(3) },
-    Item { name: "Defense +1",  cost: 20, effect: Ring::PlusDef(1) },
-    Item { name: "Defense +2",  cost: 40, effect: Ring::PlusDef(2) },
-    Item { name: "Defense +3",  cost: 80, effect: Ring::PlusDef(3) }];
+    Item { name: "Defense +1", cost:  20, effect: Ring::PlusDef(1) },
+    Item { name: "Defense +2", cost:  40, effect: Ring::PlusDef(2) },
+    Item { name: "Defense +3", cost:  80, effect: Ring::PlusDef(3) }];
 
 fn all_loadouts<C>(mut co_iter: C) where C: FnMut(&Loadout<'static>) {
     for weapon in WEAPONS.iter() {
         let mut lo = Loadout { weapon: weapon, armor: None, rings: UpTo2::zero() };
-        co_iter(&lo);
-        for armor in ARMOR.iter() {
-            lo.armor = Some(armor);
+        for armor in iter::once(None).chain(ARMOR.iter().map(Some)) {
+            lo.armor = armor;
             co_iter(&lo);
             for (i, ring0) in RINGS.iter().enumerate() {
                 lo.rings = UpTo2::one(ring0);
@@ -181,6 +180,7 @@ fn all_loadouts<C>(mut co_iter: C) where C: FnMut(&Loadout<'static>) {
                     co_iter(&lo);
                 }
             }
+            lo.rings = UpTo2::zero(); // ...maybe I shouldn't be trying to use mutability.
         }
     }
 }
@@ -197,14 +197,13 @@ impl Scenario {
         let inflicted = Damage::Physical(player_dmg).apply(self.boss_armor);
         let ttl = (self.player_hp + suffered - 1) / suffered;
 
-        //println!("*** suffered = {}, inflicted = {}, ttl = {}", suffered, inflicted, ttl);
-        
         inflicted * ttl >= self.boss_hp
     }
 }
 
-fn solve(s: &Scenario) -> Option<(Gold, Loadout)> {
-    let mut b = Best::new(Smallest);
+fn solve<Cmp>(s: &Scenario, cmp: Cmp, win: bool) -> Option<(Gold, Loadout<'static>)>
+    where Cmp: best::Cmp<Gold> {
+    let mut b = best::Best::new(cmp);
     all_loadouts(|loadout| {
         // Okay, right about now I wish I'd newtyped "plus damage" and
         // "plus defense" as distinct types.  Because I had a bug here
@@ -216,9 +215,8 @@ fn solve(s: &Scenario) -> Option<(Gold, Loadout)> {
                     (def + e.defense(), dmg + e.damage())
                 })
         });
-        if s.can_win(def, dmg) {
+        if s.can_win(def, dmg) == win {
             let cost = loadout.list(|stuff| stuff.fold(0 as HP, |a, thing| a + thing.cost()));
-            // println!("*** => {}", cost);
             b.add(cost, loadout);
         }
     });
@@ -263,28 +261,34 @@ fn parse_args<I>(mut i: I) -> Scenario
 
 fn main() {
     let scen = parse_args(env::args().skip(1));
-    if let Some((gold, loadout)) = solve(&scen) {
-        println!("Minimum gold: {}", gold);
-        loadout.weapon.print("Weapon");
-        if let Some(ref armor) = loadout.armor {
-            armor.print("Armor");
+    for (supremum, opt_soln) in vec![
+        ("Minimum", solve(&scen, best::Smallest, true)),
+        ("Maximum", solve(&scen, best::Largest, false))] {
+        if let Some((gold, loadout)) = opt_soln {
+            println!("{} gold: {}", supremum, gold);
+            loadout.weapon.print("Weapon");
+            if let Some(ref armor) = loadout.armor {
+                armor.print("Armor");
+            } else {
+                println!("No armor.");
+            }
+            match loadout.rings {
+                UpTo2::Two(ref s) => {
+                    s[0].print("Left Ring");
+                    s[1].print("Right Ring");
+                },
+                UpTo2::One(ref s) => {
+                    s[0].print("Ring");
+                }
+                UpTo2::Zero(_) => {
+                    println!("No rings.")
+                }
+            }
+            println!("");
         } else {
-            println!("No armor.");
+            println!("You die.");
+            break;
         }
-        match loadout.rings {
-            UpTo2::Two(ref s) => {
-                s[0].print("Left Ring");
-                s[1].print("Right Ring");
-            },
-            UpTo2::One(ref s) => {
-                s[0].print("Ring");
-            }
-            UpTo2::Zero(_) => {
-                println!("No rings.")
-            }
-        }
-    } else {
-        println!("You die.");
     }
 }
 
