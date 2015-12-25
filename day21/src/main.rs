@@ -1,6 +1,6 @@
 extern crate util;
 
-use std::convert::AsRef;
+use std::env;
 use std::iter;
 use std::iter::FromIterator;
 use std::ops::Deref;
@@ -25,6 +25,10 @@ trait GenItem {
     fn name(&self) -> &'static str;
     fn cost(&self) -> Gold;
     fn effect(&self) -> &Effect;
+    fn print(&self, label: &str) {
+        println!("{}: {} (+{}) [+{}]", label, self.name(),
+                 self.effect().damage(), self.effect().defense());
+    }
 }
 impl<E: Effect> GenItem for Item<E> {
     fn name(&self) -> &'static str { self.name }
@@ -118,6 +122,7 @@ impl<T: Clone> Clone for UpTo2<T> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 enum Damage {
     Physical(HP),
+    #[allow(dead_code)]
     Magic(HP),
 }
 impl Damage {
@@ -142,9 +147,9 @@ impl Damage {
 static WEAPONS: [Item<Weapon>; 5] = [
     Item { name: "Dagger",     cost: 8,  effect: Weapon { dmg: 4 } },
     Item { name: "Shortsword", cost: 10, effect: Weapon { dmg: 5 } },
-    Item { name: "Dagger",     cost: 25, effect: Weapon { dmg: 6 } },
-    Item { name: "Dagger",     cost: 40, effect: Weapon { dmg: 7 } },
-    Item { name: "Dagger",     cost: 75, effect: Weapon { dmg: 8 } }];
+    Item { name: "Warhammer",  cost: 25, effect: Weapon { dmg: 6 } },
+    Item { name: "Longsword",   cost: 40, effect: Weapon { dmg: 7 } },
+    Item { name: "Greataxe",   cost: 75, effect: Weapon { dmg: 8 } }];
 
 static ARMOR: [Item<Armor>; 5] = [
     Item { name: "Leather",    cost: 13,  effect: Armor { ac: 1 } },
@@ -155,8 +160,8 @@ static ARMOR: [Item<Armor>; 5] = [
 
 static RINGS: [Item<Ring>; 6] = [
     Item { name: "Damage +1",  cost: 25,  effect: Ring::PlusDmg(1) },
-    Item { name: "Damage +1",  cost: 50,  effect: Ring::PlusDmg(2) },
-    Item { name: "Damage +1",  cost: 100, effect: Ring::PlusDmg(3) },
+    Item { name: "Damage +2",  cost: 50,  effect: Ring::PlusDmg(2) },
+    Item { name: "Damage +3",  cost: 100, effect: Ring::PlusDmg(3) },
     Item { name: "Defense +1",  cost: 20, effect: Ring::PlusDef(1) },
     Item { name: "Defense +2",  cost: 40, effect: Ring::PlusDef(2) },
     Item { name: "Defense +3",  cost: 80, effect: Ring::PlusDef(3) }];
@@ -191,6 +196,9 @@ impl Scenario {
         let suffered = Damage::Physical(self.boss_dmg).apply(player_armor);
         let inflicted = Damage::Physical(player_dmg).apply(self.boss_armor);
         let ttl = (self.player_hp + suffered - 1) / suffered;
+
+        //println!("*** suffered = {}, inflicted = {}, ttl = {}", suffered, inflicted, ttl);
+        
         inflicted * ttl >= self.boss_hp
     }
 }
@@ -198,22 +206,86 @@ impl Scenario {
 fn solve(s: &Scenario) -> Option<(Gold, Loadout)> {
     let mut b = Best::new(Smallest);
     all_loadouts(|loadout| {
+        // Okay, right about now I wish I'd newtyped "plus damage" and
+        // "plus defense" as distinct types.  Because I had a bug here
+        // from mixing them up.  Remember the early ones when I
+        // newtyped ALL the things?  But then I got lazy....
         let (def, dmg) = loadout.list(|stuff| {
             stuff.map(|thing| thing.effect())
-                .fold((0 as HP, 0 as HP), |(dmg, def), e| {
+                .fold((0 as HP, 0 as HP), |(def, dmg), e| {
                     (def + e.defense(), dmg + e.damage())
                 })
         });
         if s.can_win(def, dmg) {
             let cost = loadout.list(|stuff| stuff.fold(0 as HP, |a, thing| a + thing.cost()));
+            // println!("*** => {}", cost);
             b.add(cost, loadout);
         }
     });
     b.finish()
 }
 
+// Also copypasted from day22:
+fn parse_args<I>(mut i: I) -> Scenario
+    where I: Iterator<Item=String> {
+    let mut player_hp = 100u16;
+    let mut boss_hp = None::<u16>;
+    let mut boss_armor = None::<u16>;
+    let mut boss_dmg = None::<u16>;
+    while let Some(word) = i.next() {
+        let value = i.next().expect("expected key/value pairs as arguments but got odd number");
+        let word = word.to_lowercase();
+        let is_player = word.contains("player");
+        let is_hp = word.contains("hp") || (word.contains("hit") && word.contains("point"));
+        let is_boss = word.contains("boss");
+        let is_dmg = word.contains("damage") || word.contains("dmg");
+        let is_armor = ["armor", "armour", "def", "ac"].iter().any(|&s| word.contains(s));
+        if is_player && is_hp {
+            player_hp = value.parse().unwrap();
+        } else if is_boss && is_hp {
+            boss_hp = Some(value.parse().unwrap())
+        } else if is_boss && is_dmg {
+            boss_dmg = Some(value.parse().unwrap())
+        } else if is_boss && is_armor {
+            boss_armor = Some(value.parse().unwrap());
+        } else {
+            panic!("unrecognized key word {}", word);
+        }
+    }
+    Scenario {
+        player_hp: player_hp,
+        boss_hp: boss_hp.expect("boss HP not specified"),
+        boss_dmg: boss_dmg.expect("boss damage not specified"),
+        boss_armor: boss_armor.expect("boss armor not specified"),
+    }
+}
+
+
 fn main() {
-    println!("Hello, world!");
+    let scen = parse_args(env::args().skip(1));
+    if let Some((gold, loadout)) = solve(&scen) {
+        println!("Minimum gold: {}", gold);
+        loadout.weapon.print("Weapon");
+        if let Some(ref armor) = loadout.armor {
+            armor.print("Armor");
+        } else {
+            println!("No armor.");
+        }
+        match loadout.rings {
+            UpTo2::Two(ref s) => {
+                s[0].print("Left Ring");
+                s[1].print("Right Ring");
+            },
+            UpTo2::One(ref s) => {
+                s[0].print("Ring");
+            }
+            UpTo2::Zero(_) => {
+                println!("No rings.")
+            }
+        }
+    } else {
+        println!("You die.");
+    }
 }
 
 #[cfg(test)]
