@@ -1,3 +1,5 @@
+use std::env;
+
 struct KeyGen {
     next: u32
 }
@@ -36,7 +38,13 @@ impl Iterator for Cantor {
 }
 
 fn main() {
-    println!("Hello, world!");
+    let mut args = env::args().skip(1);
+    let the_row = args.next().expect("argument #1 is the row").parse().unwrap();
+    let the_col = args.next().expect("argument #2 is the column").parse().unwrap();
+    let (_, key) = Cantor::new().zip(KeyGen::new()).find(|&((row, col), _)| {
+        row == the_row && col == the_col
+    }).unwrap();
+    println!("{}", key);
 }
 
 #[cfg(test)]
