@@ -41,6 +41,9 @@ impl<S: Score, T, C: Cmp<S>> Best<S, T, C> {
     pub fn get(&self) -> Option<(S, &T)> {
         self.best.as_ref().map(|&(s, ref t)| (s, t))
     }
+    pub fn finish(self) -> Option<(S, T)> {
+        self.best
+    }
     pub fn unwrap(self) -> (S, T) {
         self.best.unwrap()
     }

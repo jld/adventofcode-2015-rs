@@ -1,0 +1,6 @@
+[package]
+name = "day21"
+version = "0.1.0"
+authors = ["Jed Davis <jld@panix.com>"]
+[dependencies]
+util = { version = "0.1.6", path = "../util" }
