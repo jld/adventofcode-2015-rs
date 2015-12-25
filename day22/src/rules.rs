@@ -263,7 +263,7 @@ impl State {
 
 #[cfg(test)]
 mod tests {
-    use super::{Damage,Spell,State,World,Result,Win};
+    use super::{Damage,State,World,Result,Win};
     use super::{MagicMissile,Drain,Shield,Poison,Recharge};
 
     #[test]

@@ -1,10 +1,9 @@
 extern crate util;
 mod rules;
 
-use std::cell::Cell;
 use std::env;
 use util::best;
-use rules::{World,State,Spell,Won,Lost,Ok,Win};
+use rules::{World,State,Spell,Won,Lost,Ok};
 
 fn parse_args<I>(mut i: I) -> (World, State)
     where I: Iterator<Item=String> {
@@ -79,4 +78,28 @@ fn main() {
     let (cost, spells) = full_search(&world, &state);
     println!("Minimal cost: {}", cost);
     println!("Spell sequence: {:?}", spells);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{parse_args, full_search};
+    use rules::{MagicMissile, Drain, Shield, Poison, Recharge};
+
+    // How convenient that the examples happen to be minimal.
+
+    #[test]
+    fn example1() {
+        let args = "playerhp 10 mana 250 bosshp 13 bossdmg 8".split(' ').map(|s| s.to_owned());
+        let (world, state) = parse_args(args);
+        let (_, ritual) = full_search(&world, &state);
+        assert_eq!(ritual, vec![Poison, MagicMissile]);
+    }
+
+    #[test]
+    fn example2() {
+        let args = "playerhp 10 mana 250 bosshp 14 bossdmg 8".split(' ').map(|s| s.to_owned());
+        let (world, state) = parse_args(args);
+        let (_, ritual) = full_search(&world, &state);
+        assert_eq!(ritual, vec![Recharge, Shield, Drain, Poison, MagicMissile]);
+    }
 }
