@@ -118,11 +118,15 @@ impl Damage {
 
 #[derive(Debug, Clone)]
 pub struct World {
-    boss_damage: Damage
+    boss_damage: Damage,
+    hardness: u16,
 }
 impl World {
     pub fn new(boss_damage: u16) -> World {
-        World { boss_damage: Damage::Physical(boss_damage) }
+        Self::new_hard(boss_damage, 0)
+    }
+    pub fn new_hard(boss_damage: u16, hardness: u16) -> World {
+        World { boss_damage: Damage::Physical(boss_damage), hardness: hardness }
     }
 }
 
@@ -253,6 +257,7 @@ impl State {
     // TODO: some kind of event/visitor thing to enable the text UI shown. Because why not.
     pub fn round(self, w: &World, sp: Spell) -> Result {
         Ok(self)
+            .chain(|nself| nself.suffer(Damage::Magic(w.hardness)))
             .chain(|nself| nself.upkeep())
             .chain(|nself| nself.cast(sp))
             .chain(|nself| nself.upkeep())

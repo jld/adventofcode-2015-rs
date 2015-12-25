@@ -11,6 +11,7 @@ fn parse_args<I>(mut i: I) -> (World, State)
     let mut player_mana = 500u16;
     let mut boss_hp = None::<u16>;
     let mut boss_dmg = None::<u16>;
+    let mut hardness = 0u16;
     while let Some(word) = i.next() {
         let value = i.next().expect("expected key/value pairs as arguments but got odd number");
         let word = word.to_lowercase();
@@ -19,6 +20,7 @@ fn parse_args<I>(mut i: I) -> (World, State)
         let is_mana = word.contains("mana");
         let is_boss = word.contains("boss");
         let is_dmg = word.contains("damage") || word.contains("dmg");
+        let is_hard = word.contains("hard");
         if is_player && is_hp {
             player_hp = value.parse().unwrap();
         } else if is_mana {
@@ -27,13 +29,15 @@ fn parse_args<I>(mut i: I) -> (World, State)
             boss_hp = Some(value.parse().unwrap())
         } else if is_boss && is_dmg {
             boss_dmg = Some(value.parse().unwrap())
+        } else if is_hard {
+            hardness = value.parse().unwrap();
         } else {
             panic!("unrecognized key word {}", word);
         }
     }
     let boss_hp = boss_hp.expect("boss HP not specified");
     let boss_dmg = boss_dmg.expect("boss damage not specified");
-    (World::new(boss_dmg), State::new(player_hp, player_mana, boss_hp))
+    (World::new_hard(boss_dmg, hardness), State::new(player_hp, player_mana, boss_hp))
 }
 
 // ...why did I not typedef the numbers in rules.rs?  Oh well.
